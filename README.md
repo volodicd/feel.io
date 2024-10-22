@@ -28,7 +28,7 @@ The approximate realization time is 3-4 months. \
  &ensp; &ensp;&ensp;  1.	Design and build image processing model: 2-3 weeks \
  &ensp; &ensp;&ensp;  2.	Design and build sound processing model: 1-2 weeks\
 &ensp;  &ensp;&ensp;  3.	Apply transfer learning: 1 week\
- &ensp;&ensp;&ensp;&ensp; 4.	Optimization and checking for possible problems: 1 week\
+&ensp;&ensp;&ensp; 4.	Optimization and checking for possible problems: 1 week\
  &ensp; •	Training on multiple datasets: 3 weeks\
  &ensp; •	Fine-tunning the network: Optimising model: 2 weeks\
  &ensp; •	App development: 1 week\
