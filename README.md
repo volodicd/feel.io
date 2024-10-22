@@ -1,5 +1,6 @@
 # feel.io
 An incredible AI to detect emotions from the different sources
+
 This is a project for a deep learning course. The decided topic is an app that detects emotions from different sources, such as sound, photos, or videos.  Model can use either one or more sources for detection. 
 The result of this project would be a model with a user app that will use this model.
 
