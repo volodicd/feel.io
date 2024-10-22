@@ -17,6 +17,17 @@ Although, there was a traditional way to detect emotions, like the Gabor filter[
 
 Several datasets will be used for training, as multiple sources will be used. The list is not completed yet, as I’m still thinking about ways to combine several different datasets.
 
+Most probably, the following datasets will be used for image processing:
+- **FER2013**
+- **Google Facial Expression Comparison Dataset**
+- **AffectNet** (if accessible)
+
+Almost all of these datasets combine photos with emotion descriptions. Some of them already have normalized numbered representations of images, but since several datasets will be combined, normalization will be necessary.
+
+For sound processing, the **RAVDESS** dataset will be used. This dataset contains sound files, and the name of the file contains data about the corresponding emotion.
+
+The datasets section may be updated as datasets could change during the processing phase.
+
 # Developing Process
 
 To develop such an app, a multimodal approach will be utilized, which will combine facial expression recognitions with sound ones and give an output depending on those factors.
