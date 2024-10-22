@@ -19,18 +19,18 @@ Several datasets will be used for training, as multiple sources will be used. Li
 To develop such an app multimodal approach will be utilized, which will combine facial expression recognitions with sound ones and give an output depending on those factors.
 The approximate realization time is 3-4 months. \
 **Detailed project plan:**\
-  •	Datasets analysis – finding the most combinable datasets and combining them: 2 weeks\
-  •	Data preprocessing – Cleaning and normalizing datasets: 2-3 weeks\
-  •	Model design and build\
-    1.	Design and build image processing model: 2-3 weeks \
-    2.	Design and build sound processing model: 1-2 weeks\
-    3.	Apply transfer learning: 1 week\
-    4.	Optimization and checking for possible problems: 1 week\
-  •	Training on multiple datasets: 3 weeks\
-  •	Fine-tunning the network: Optimising model: 2 weeks\
-  •	App development: 1 week\
-  •	Writing final report: 2 weeks\
-  •	Preparing presentation: 1 week\
+  &ensp;•	Datasets analysis – finding the most combinable datasets and combining them: 2 weeks\
+  &ensp;•	Data preprocessing – Cleaning and normalizing datasets: 2-3 weeks\
+  &ensp;•	Model design and build\
+  &ensp;&ensp;  1.	Design and build image processing model: 2-3 weeks \
+  &ensp;&ensp;  2.	Design and build sound processing model: 1-2 weeks\
+  &ensp;&ensp;  3.	Apply transfer learning: 1 week\
+   &ensp;&ensp; 4.	Optimization and checking for possible problems: 1 week\
+ &ensp; •	Training on multiple datasets: 3 weeks\
+ &ensp; •	Fine-tunning the network: Optimising model: 2 weeks\
+ &ensp; •	App development: 1 week\
+ &ensp; •	Writing final report: 2 weeks\
+ &ensp; •	Preparing presentation: 1 week\
 
 
 **References **
