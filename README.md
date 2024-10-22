@@ -10,7 +10,13 @@ There are some implementations of such AI as “Affectiva's emotion API” and �
 Although, there was a traditional way to detect emotions, like the Gabor filter[1] with the classification, after the CNN[2] implementation, which was more efficient I cannot call it a classical method nowadays. Therefore, I can classify my project either as “Bring your own method” or “Beat the classics”. Despite this, it is worth noting that I will still consider the main goal as “Bring your own method”, but also will compare it to the “traditional” one in the end.
 
 **Datasets**\
-Several datasets will be used for training, as multiple sources will be used. List is not completed yet, as I’m still thinking about ways to combine several different datasets. 
+Several datasets will be used for training, as multiple sources will be used. The list is not completed yet, as I’m still thinking about ways to combine several different datasets. 
+Most probably such datasets would be used for image processing:
+“FER2013”, “Google Facial Expression Comparison Dataset”. Also, I will try to get AffectNet dataset.
+Almost all of these datasets combine photos and emotion descriptions for them. Some of them already have normalized numbered representations of images, but as several datasets would be combined, normalization would be necessary.\
+For sound processing “RAVDESS” dataset will be used. This dataset contains sound files, and the name of the file contains data about emotion.\
+Datasets part will be updating, as datasets could be changed during processing.
+
 
 **Developing process**\
 To develop such an app multimodal approach will be utilized, which will combine facial expression recognitions with sound ones and give an output depending on those factors.
