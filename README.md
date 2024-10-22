@@ -36,7 +36,7 @@ The approximate realization time is 3-4 months.
 
 ## Detailed Project Plan:
 
-- **Datasets analysis** – Finding the most combinable datasets and combining them: 2 weeks.
+- **Datasets analysis** – Finding the most combinable datasets and combining them: 2 weeks.(🚧)
 - **Data preprocessing** – Cleaning and normalizing datasets: 2-3 weeks.
 - **Model design and build** 
   - Design and build image processing model: 2-3 weeks 
