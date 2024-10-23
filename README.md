@@ -47,7 +47,7 @@ The approximate realization time is 3-4 months.
 - **Fine-tuning the network**: Optimizing the model: 2 weeks 
 - **App development**: 1 week
 - **Writing final report**: 2 weeks
-- **Preparing presentation**: 1 week
+- **Preparing presentation**: 1 week\
 (🚧) - we are here
 # References 
 
