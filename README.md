@@ -19,6 +19,10 @@ Several datasets will be used for training, as multiple sources will be used. Th
 
 Most probably, the following datasets will be used for image processing:
 - **FER2013**
+- **CelebA**
+- **ExpW**
+- **GoEmotions**
+- **Emotic**
 - **Google Facial Expression Comparison Dataset**
 - **AffectNet** (if accessible)
 
@@ -36,8 +40,8 @@ The approximate realization time is 3-4 months.
 
 ## Detailed Project Plan:
 
-- **Datasets analysis** – Finding the most combinable datasets and combining them: 2 weeks.(🚧)
-- **Data preprocessing** – Cleaning and normalizing datasets: 2-3 weeks.
+- **Datasets analysis** – Finding the most combinable datasets and combining them: 2 weeks.
+- **Data preprocessing** – Cleaning and normalizing datasets: 2-3 weeks. (🚧)
 - **Model design and build** 
   - Design and build image processing model: 2-3 weeks 
   - Design and build sound processing model: 1-2 weeks
