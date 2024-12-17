@@ -56,11 +56,18 @@ class EmotionTrainer:
         self.log_dir = Path ('logs') / timestamp
         self.log_dir.mkdir (parents=True, exist_ok=True)
 
+        # Configure root logger
         logging.basicConfig (
-            filename=self.log_dir / 'training.log',
             level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler (self.log_dir/'training.log'),
+                logging.StreamHandler ()  # This will also print to console
+            ]
         )
+
+        logging.info ("Started training session")
+        logging.info (f"Config: {self.config}")
 
     def setup_directories (self):
         """Create necessary directories for saving results"""
@@ -101,11 +108,17 @@ class EmotionTrainer:
 
             # Training phase
             train_loss, train_metrics = self.train_epoch (train_loader, epoch)
-            logging.info (f"Training Loss: {train_loss:.4f}")
+            logging.info (f"Training - Loss: {train_loss:.4f}, "
+                          f"Image Acc: {train_metrics['image_accuracy']:.4f}, "
+                          f"Audio Acc: {train_metrics['audio_accuracy']:.4f}, "
+                          f"Fusion Acc: {train_metrics['fusion_accuracy']:.4f}")
 
             # Validation phase
             val_loss, val_metrics, predictions = self.validate (val_loader, epoch)
-            logging.info (f"Validation Loss: {val_loss:.4f}")
+            logging.info (f"Validation - Loss: {val_loss:.4f}, "
+                          f"Image Acc: {val_metrics['image_accuracy']:.4f}, "
+                          f"Audio Acc: {val_metrics['audio_accuracy']:.4f}, "
+                          f"Fusion Acc: {val_metrics['fusion_accuracy']:.4f}")
 
             # Update learning rate scheduler
             self.scheduler.step (val_loss)
