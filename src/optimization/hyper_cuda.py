@@ -258,6 +258,18 @@ class EnhancedHyperparameterOptimizer:
         """Log trial progress."""
         logging.info (f"Trial {trial.number} finished with value: {trial.value} and params: {trial.params}")
 
+    def optimize (self) -> Dict[str, Any]:
+        """Wrapper method to run hyperparameter optimization."""
+        return self.optimize_parallel ()
+
+    def optimize_parallel (self) -> Dict[str, Any]:
+        """Parallel optimization wrapper to align with updated method calls."""
+        return self.aggregate_results (optuna.create_study (
+            direction="maximize",
+            sampler=TPESampler (n_startup_trials=5, multivariate=True),
+            pruner=MedianPruner (n_startup_trials=10, n_warmup_steps=5)
+        ))
+
     def aggregate_results (self, study: optuna.Study) -> Dict[str, Any]:
         """Aggregate results of the study."""
         completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
