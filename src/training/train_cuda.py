@@ -35,7 +35,7 @@ class EmotionTrainer:
         self.setup_device ()
         self.setup_tensorboard ()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-        self.scaler = torch.cuda.amp.GradScaler ()  # For mixed precision training
+        self.scaler = torch.amp.GradScaler(device_type='cuda')  # For mixed precision training
 
     def setup_device (self):
         """Setup CUDA device for training with proper initialization"""
@@ -159,17 +159,7 @@ class EmotionTrainer:
             audio = batch['audio'].cuda (non_blocking=True)
             image = batch['image'].cuda (non_blocking=True)
             targets = batch['emotion'].cuda (non_blocking=True)
-            print ("Batch Image Shape:", image.shape)  # Should be [B, 3, H, W]
-            print ("Batch Audio Shape:", audio.shape)  # Should be [B, 1, T]
-            print ("Batch Targets Shape:", targets.shape)
-            if epoch == 0 and len (all_targets) == 0:  # Print only once
-                print ("### Sample Debug Info ###")
-                print ("Targets (emotions):", targets.cpu ().numpy ())  # Labels
-                print ("Image Shape:", image.shape if image is not None else "None")  # Shape of image input
-                print ("Audio Shape:", audio.shape if audio is not None else "None")  # Shape of audio input
-                print ("Text Input:", batch.get ('text', 'None'))  # Text input if available
-            if epoch == 0:
-                print ("Targets (First Few Batches):", targets.cpu ().numpy ())
+            print ("Targets (First Few Batches):", targets.cpu ().numpy ())
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
@@ -232,8 +222,9 @@ class EmotionTrainer:
                 audio = batch['audio'].cuda (non_blocking=True)
                 image = batch['image'].cuda (non_blocking=True)
                 targets = batch['emotion'].cuda (non_blocking=True)
+                print ("Targets in batch (validation):", targets.cpu ().numpy ())
 
-                with torch.cuda.amp.autocast ():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs = self.model(image=image, audio=audio)
                     loss = self.criterion (outputs, targets)
 
@@ -254,7 +245,6 @@ class EmotionTrainer:
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
             )
-        print ("Validation Outputs (Fusion):", outputs['fusion'].argmax (1).cpu ().numpy ()[:16])
         return metrics['loss'], metrics, predictions
 
     def save_checkpoint (self, epoch: int, metrics: Dict):
