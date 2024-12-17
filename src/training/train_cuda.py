@@ -295,7 +295,7 @@ def main ():
         'learning_rate': 1e-4,
         'weight_decay': 0.1,
         'epochs': 50,
-        'patience': 20,
+        'patience': 10,
         'scheduler_patience': 2,
         'grad_clip': 1.0,
         'pin_memory': True,
