@@ -47,61 +47,55 @@ class DatasetProcessor:
             'surprise': 6
         }
 
-    def validate_dataset(self, df: pd.DataFrame, dataset_name: str) -> bool:
+    def validate_dataset (self, df: pd.DataFrame, dataset_name: str) -> bool:
         """
         Validate processed dataset for completeness and correctness.
-
-        Metrics tracked:
-        - Data completeness: All required columns present
-        - Data validity: Emotion values within valid range (0-6)
-        - File existence: All referenced files exist
-        - Class balance: Ratio between largest and smallest classes
-
-        Target metrics:
-        - 100% required columns present
-        - 100% valid emotion values
-        - File existence rate > 95%
-        - Class imbalance ratio < 10:1
         """
         try:
+            # Define required columns based on dataset type
+            if dataset_name == "GoEmotions":
+                required_cols = ['text', 'emotion', 'split']
+            else:
+                required_cols = ['path', 'emotion', 'split']
+
             # Verify required columns exist
-            required_cols = ['path', 'emotion', 'split']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
-                logging.error(f"{dataset_name}: Missing columns: {missing_cols}")
+                logging.error (f"{dataset_name}: Missing columns: {missing_cols}")
                 return False
 
             # Verify emotion values are valid
-            invalid_emotions = df[~df['emotion'].isin(range(7))]
+            invalid_emotions = df[~df['emotion'].isin (range (7))]
             if not invalid_emotions.empty:
-                logging.error(f"{dataset_name}: Found {len(invalid_emotions)} invalid emotion values")
+                logging.error (f"{dataset_name}: Found {len (invalid_emotions)} invalid emotion values")
                 return False
 
-            # Check all files exist
-            invalid_files = 0
-            for _, row in df.iterrows():
-                if not Path(row['path']).exists():
-                    invalid_files += 1
+            # Check file existence only for datasets with paths
+            if 'path' in df.columns:
+                invalid_files = 0
+                for _, row in df.iterrows ():
+                    if not Path (row['path']).exists ():
+                        invalid_files += 1
 
-            if invalid_files > 0:
-                logging.warning(f"{dataset_name}: {invalid_files} files not found")
+                if invalid_files > 0:
+                    logging.warning (f"{dataset_name}: {invalid_files} files not found")
 
             # Log split distribution
-            split_dist = df['split'].value_counts()
-            logging.info(f"{dataset_name} split distribution: {split_dist.to_dict()}")
-            emotion_dist = df['emotion'].value_counts()
-            logging.info(f"{dataset_name} emotion distribution:\n{emotion_dist}")
+            split_dist = df['split'].value_counts ()
+            logging.info (f"{dataset_name} split distribution: {split_dist.to_dict ()}")
+            emotion_dist = df['emotion'].value_counts ()
+            logging.info (f"{dataset_name} emotion distribution:\n{emotion_dist}")
 
             # Check for potential class imbalance
-            min_samples = emotion_dist.min()
-            max_samples = emotion_dist.max()
+            min_samples = emotion_dist.min ()
+            max_samples = emotion_dist.max ()
             if min_samples > 0 and (max_samples / min_samples > 10):
-                logging.warning(f"{dataset_name}: High class imbalance detected")
+                logging.warning (f"{dataset_name}: High class imbalance detected")
 
             return True
 
         except Exception as e:
-            logging.error(f"Validation error for {dataset_name}: {str(e)}")
+            logging.error (f"Validation error for {dataset_name}: {str (e)}")
             return False
 
     def process_fer2013(self) -> pd.DataFrame:

@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, RandomSampler
 from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
 from src.utils.visualization import ModelVisualizer, LRFinder
+from src.utils.data_aligment import align_datasets
 
 
 class EmotionTrainer:
@@ -279,76 +280,84 @@ class EmotionTrainer:
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
 
-def main():
+def main ():
     # Configuration optimized for CUDA
     config = {
-        'batch_size': 16,  # Increased for GPU
-        'num_workers': 4,  # Adjust based on CPU cores
-        'learning_rate': 1e-4,
-        'weight_decay': 0.1,
-        'epochs': 10,
-        'patience': 5,
-        'scheduler_patience': 2,
-        'grad_clip': 1.0,
-        'pin_memory': True,
-        'cuda_non_blocking': True
+        'batch_size': 32,  # Increased - most GPUs can handle this
+        'num_workers': 4,  # Keep this
+        'learning_rate': 3e-4,  # Slightly higher to start
+        'weight_decay': 0.01,  # Reduced to prevent over-regularization
+        'epochs': 30,  # Increased to give more training time
+        'patience': 7,  # Increased slightly
+        'scheduler_patience': 3,  # Increased slightly
+        'grad_clip': 1.0,  # Keep this
+        'pin_memory': True,  # Keep this
+        'cuda_non_blocking': True  # Keep this
     }
 
     try:
-        # Load and shuffle datasets independently
-        image_data = pd.concat([
-            pd.read_csv('data/processed/fer2013.csv').sample(frac=1, random_state=42),
-            pd.read_csv('data/processed/expw.csv').sample(frac=1, random_state=42)
-        ]).reset_index(drop=True)
+        # Load datasets
+        logging.info ("Loading datasets...")
+        image_data = pd.concat ([
+            pd.read_csv ('data/processed/fer2013.csv'),
+            pd.read_csv ('data/processed/expw.csv')
+        ])
+        audio_data = pd.read_csv ('data/processed/ravdess.csv')
+        text_data = pd.read_csv ('data/processed/goemotions.csv')
 
-        audio_data = pd.read_csv('data/processed/ravdess.csv').sample(frac=1, random_state=42).reset_index(drop=True)
-        goemotions_data = pd.read_csv('data/processed/goemotions.csv').sample(frac=1, random_state=42).reset_index(drop=True)
+        # Align datasets
+        logging.info ("Aligning datasets...")
+        aligned_data = align_datasets (image_data, audio_data, text_data)
 
+        if aligned_data is None:
+            raise RuntimeError ("Failed to align datasets")
 
-        # Create datasets
-        train_dataset = MultiModalEmotionDataset(
-            image_data=image_data,
-            audio_data=audio_data,
-            text_data=goemotions_data,
+        logging.info (
+            f"Aligned dataset sizes - Train: {len (aligned_data['image'][aligned_data['image']['split'] == 'train'])}, "
+            f"Test: {len (aligned_data['image'][aligned_data['image']['split'] == 'test'])}")
+
+        # Create datasets with aligned data
+        train_dataset = MultiModalEmotionDataset (
+            image_data=aligned_data['image'],
+            audio_data=aligned_data['audio'],
+            text_data=aligned_data['text'],
             split='train'
         )
 
-        val_dataset = MultiModalEmotionDataset(
-            image_data=image_data,
-            audio_data=audio_data,
-            text_data=goemotions_data,
+        val_dataset = MultiModalEmotionDataset (
+            image_data=aligned_data['image'],
+            audio_data=aligned_data['audio'],
+            text_data=aligned_data['text'],
             split='test'
         )
 
         # Data loaders
-        train_loader = DataLoader(
+        train_loader = DataLoader (
             train_dataset,
             batch_size=config['batch_size'],
-            sampler=RandomSampler(train_dataset),  # Ensures shuffling
+            sampler=RandomSampler (train_dataset),
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
             persistent_workers=True
         )
 
-        val_loader = DataLoader(
+        val_loader = DataLoader (
             val_dataset,
             batch_size=config['batch_size'],
-            shuffle=False,  # No need to shuffle validation data
+            shuffle=False,
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
             persistent_workers=True
         )
 
         # Initialize and train
-        trainer = EmotionTrainer(config)
-        trainer.train(train_loader, val_loader)
+        trainer = EmotionTrainer (config)
+        trainer.train (train_loader, val_loader)
 
     except Exception as e:
-        logging.error(f"Training error: {str(e)}")
+        logging.error (f"Training error: {str (e)}")
         raise
 
 
-
 if __name__ == '__main__':
-    main()
-
+    main ()
