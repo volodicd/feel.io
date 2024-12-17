@@ -287,9 +287,9 @@ def main ():
         'batch_size': 16,  # Increased for GPU
         'num_workers': 4,  # Adjust based on CPU cores
         'learning_rate': 1e-4,
-        'weight_decay': 0.01,
-        'epochs': 150,
-        'patience': 50,
+        'weight_decay': 0.1,
+        'epochs': 50,
+        'patience': 20,
         'scheduler_patience': 2,
         'grad_clip': 1.0,
         'pin_memory': True,
