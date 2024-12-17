@@ -1,19 +1,13 @@
 # src/training/train.py
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, SubsetRandomSampler
 import pandas as pd
 from pathlib import Path
 import logging
 from datetime import datetime
 from tqdm import tqdm
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
-from sklearn.model_selection import KFold
-import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, RandomSampler
 # Import from your project structure
@@ -35,7 +29,7 @@ class EmotionTrainer:
         self.setup_device ()
         self.setup_tensorboard ()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-        self.scaler = torch.amp.GradScaler(device_type='cuda')  # For mixed precision training
+        self.scaler = torch.amp.GradScaler()  # For mixed precision training
 
     def setup_device (self):
         """Setup CUDA device for training with proper initialization"""
