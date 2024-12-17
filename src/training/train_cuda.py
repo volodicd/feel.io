@@ -147,6 +147,7 @@ class EmotionTrainer:
     def train_epoch (self, train_loader: DataLoader, epoch: int) -> Tuple[float, Dict]:
         """Train for one epoch with CUDA and mixed precision optimizations"""
         self.model.train ()
+
         total_loss = 0.0
         predictions = {'image': [], 'audio': [], 'fusion': []}
         all_targets = []
@@ -157,6 +158,9 @@ class EmotionTrainer:
             audio = batch['audio'].cuda (non_blocking=True)
             image = batch['image'].cuda (non_blocking=True)
             targets = batch['emotion'].cuda (non_blocking=True)
+            print ("Batch Image Shape:", image.shape)  # Should be [B, 3, H, W]
+            print ("Batch Audio Shape:", audio.shape)  # Should be [B, 1, T]
+            print ("Batch Targets Shape:", targets.shape)
 
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
