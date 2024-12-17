@@ -57,5 +57,8 @@ The approximate realization time is 3-4 months.
 
 1. [Gabor filter](https://www.sciencedirect.com/science/article/abs/pii/S0045790621001890)
 2. A CNN-LSTM Based Deep Neural Networks for Facial Emotion Detection in Videos - Arnold Sachith A Hans
+3. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "Context based emotion recognition using emotic dataset." IEEE transactions on pattern analysis and machine intelligence 42, no. 11 (2019): 2755-2766.
+4. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "Emotion recognition in context." In Proceedings of the IEEE conference on computer vision and pattern recognition, pp. 1667-1675. 2017.
+5. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "EMOTIC: Emotions in Context dataset." In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition Workshops, pp. 61-69. 2017.
 
 

@@ -1,0 +1,15 @@
+path,emotion,split
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/angry/sample_angry.jpg,0,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/disgust/sample_disgust.jpg,1,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/fear/sample_fear.jpg,2,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/happy/sample_happy.jpg,3,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/neutral/sample_neutral.jpg,4,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/sad/sample_sad.jpg,5,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/train/surprise/sample_surprise.jpg,6,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/angry/sample_angry.jpg,0,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/disgust/sample_disgust.jpg,1,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/fear/sample_fear.jpg,2,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/happy/sample_happy.jpg,3,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/neutral/sample_neutral.jpg,4,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/sad/sample_sad.jpg,5,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp7j_p89f_/data/raw/FER-2013/test/surprise/sample_surprise.jpg,6,test
