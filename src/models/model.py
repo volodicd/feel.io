@@ -128,81 +128,95 @@ class ImprovedEmotionModel(nn.Module):
     # -------------------------------------------------------------
     # Forward pass (audio, image, text)
     # -------------------------------------------------------------
-    def forward(self,
-                audio: torch.Tensor,      # shape: [B, 1, T_audio]
-                image: torch.Tensor,      # shape: [B, 3, H, W]
-                text_input: Optional[torch.Tensor] = None  # shape: [B, seq_len] of token IDs
-                ) -> Dict[str, torch.Tensor]:
+    def forward (self,
+                 image: Optional[torch.Tensor] = None,  # shape: [B, 3, H, W]
+                 audio: Optional[torch.Tensor] = None,  # shape: [B, 1, T_audio]
+                 text_input: Optional[torch.Tensor] = None  # shape: [B, seq_len] of token IDs
+                 ) -> Dict[str, torch.Tensor]:
         """
         Args:
-            audio: Tensor of shape [batch_size, 1, audio_length]
-            image: Tensor of shape [batch_size, 3, H, W]
-            text_input: Optional tensor of shape [batch_size, seq_len] representing tokenized text IDs
+            image: Tensor of shape [batch_size, 3, H, W] or None
+            audio: Tensor of shape [batch_size, 1, audio_length] or None
+            text_input: Tensor of shape [batch_size, seq_len] or None
 
         Returns:
             Dictionary with keys: 'image_pred', 'audio_pred', 'text_pred', 'fusion_pred'
         """
+        # Initialize predictions dictionary
+        predictions = {}
+
+        # Placeholder features for missing modalities
+        batch_size = 1  # Default batch size
+        device = torch.device ("cpu")
+
+        if image is not None:
+            batch_size = image.size (0)
+            device = image.device
+        elif audio is not None:
+            batch_size = audio.size (0)
+            device = audio.device
+        elif text_input is not None:
+            batch_size = text_input.size (0)
+            device = text_input.device
+
+        zero_features = torch.zeros ((batch_size, 256), device=device)
 
         # ---------------------------------------------------------
-        # 1. Encode Image
+        # 1. Encode Image (if provided)
         # ---------------------------------------------------------
-        image_features = self.image_encoder(image)  # [B, 256, 1, 1]
-        image_features = image_features.squeeze(-1).squeeze(-1)  # [B, 256]
-        image_pred = self.classifiers['image'](image_features)
+        if image is not None:
+            image_features = self.image_encoder (image)  # [B, 256, 1, 1]
+            image_features = image_features.squeeze (-1).squeeze (-1)  # [B, 256]
+            image_pred = self.classifiers['image'] (image_features)
+            predictions['image_pred'] = image_pred
+        else:
+            image_features = zero_features  # Replace with zeros if image is missing
 
         # ---------------------------------------------------------
-        # 2. Encode Audio
+        # 2. Encode Audio (if provided)
         # ---------------------------------------------------------
-        audio_features = self.audio_encoder(audio).squeeze(-1)  # [B, 256]
-        audio_pred = self.classifiers['audio'](audio_features)
+        if audio is not None:
+            audio_features = self.audio_encoder (audio).squeeze (-1)  # [B, 256]
+            audio_pred = self.classifiers['audio'] (audio_features)
+            predictions['audio_pred'] = audio_pred
+        else:
+            audio_features = zero_features  # Replace with zeros if audio is missing
 
         # ---------------------------------------------------------
         # 3. Encode Text (if provided)
         # ---------------------------------------------------------
         if text_input is not None:
-            # text_input: [B, seq_len]
-            embedded = self.text_embedding(text_input)        # [B, seq_len, embed_dim]
-            # Pass through LSTM
-            rnn_out, (h, c) = self.text_rnn(embedded)         # [B, seq_len, rnn_hidden], h shape: [2, B, rnn_hidden//2]
-
-            # We can take the final hidden state from both directions (concatenate)
-            # or we can do mean pooling. Let's do mean pooling for simplicity:
-            text_feat = rnn_out.mean(dim=1)  # shape: [B, rnn_hidden]
-
-            # Project to 256
-            text_features = self.text_proj(text_feat)  # [B, 256]
-            text_pred = self.classifiers['text'](text_features)
-        else:
-            # If text is missing, we can set text_features = 0 or skip it
-            # For now, let's do a zero tensor if text isn't provided.
-            text_features = torch.zeros_like(audio_features)  # shape [B, 256]
-            text_pred = None
-
-        # ---------------------------------------------------------
-        # 4. Fusion with Cross-Attention
-        # ---------------------------------------------------------
-        # We have 3 embeddings: image_features, audio_features, text_features
-        # Each is [B, 256]. Let's treat them as "tokens" in cross-attention.
-        # Minimal approach: stack them: shape [B, 3, 256]
-        stack = torch.stack([image_features, audio_features, text_features], dim=1)  # [B, 3, 256]
-
-        # Let's do a self-attention among these 3 tokens for fusion:
-        fused, _ = self.cross_attention(stack, stack, stack)  # shape [B, 3, 256]
-
-        # For final fusion, maybe we just mean-pool or take first token. Let's do mean-pooling across tokens:
-        fused_features = fused.mean(dim=1)  # [B, 256]
-
-        # Classification on fused features
-        fusion_pred = self.classifiers['fusion'](fused_features)
-
-        # Return dictionary of predictions
-        predictions = {
-            'image_pred': image_pred,
-            'audio_pred': audio_pred,
-            'fusion_pred': fusion_pred
-        }
-        if text_pred is not None:
+            embedded = self.text_embedding (text_input)  # [B, seq_len, embed_dim]
+            rnn_out, _ = self.text_rnn (embedded)  # [B, seq_len, rnn_hidden]
+            text_feat = rnn_out.mean (dim=1)  # Mean pooling [B, rnn_hidden]
+            text_features = self.text_proj (text_feat)  # [B, 256]
+            text_pred = self.classifiers['text'] (text_features)
             predictions['text_pred'] = text_pred
+        else:
+            text_features = zero_features  # Replace with zeros if text is missing
+
+        # ---------------------------------------------------------
+        # 4. Fusion using only available features
+        # ---------------------------------------------------------
+        features = []
+        if image is not None:
+            features.append (image_features)
+        if audio is not None:
+            features.append (audio_features)
+        if text_input is not None:
+            features.append (text_features)
+
+        # Stack only available features
+        if len (features) > 0:
+            fused_features = torch.stack (features, dim=1)  # Stack available modalities: [B, num_features, 256]
+            fused, _ = self.cross_attention (fused_features, fused_features, fused_features)  # Cross-attention
+            fusion_features = fused.mean (dim=1)  # Mean-pooling: [B, 256]
+        else:
+            fusion_features = zero_features
+
+        # Final fusion prediction
+        fusion_pred = self.classifiers['fusion'] (fusion_features)
+        predictions['fusion_pred'] = fusion_pred
 
         return predictions
 
