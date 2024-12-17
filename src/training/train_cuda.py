@@ -167,7 +167,7 @@ class EmotionTrainer:
 
             # Mixed precision forward pass
             with torch.cuda.amp.autocast ():
-                outputs = self.model (audio, image)
+                outputs = self.model(image=image, audio=audio)
                 loss = self.criterion (outputs, targets)
 
             # Scaled backpropagation
