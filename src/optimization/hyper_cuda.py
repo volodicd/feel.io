@@ -174,19 +174,16 @@ class EnhancedHyperparameterOptimizer:
             early_stopping_counter = 0
 
             for epoch in range (20):
-                # Clear cache before each epoch
                 torch.cuda.empty_cache ()
-
                 train_loss = self.train_epoch (
                     model, train_loader, optimizer, criterion, params['gradient_clip']
                 )
-
                 val_loss, accuracy = self.validate (model, val_loader, criterion)
-
                 scheduler.step (val_loss)
                 trial.report (accuracy, epoch)
+                print (f"Trial {trial.number}, Epoch {epoch}, Accuracy: {accuracy:.4f}")
 
-                if trial.should_prune ():
+                if trial.should_prune () and epoch > 5:
                     raise optuna.TrialPruned ()
 
                 if accuracy > best_accuracy:
@@ -196,42 +193,34 @@ class EnhancedHyperparameterOptimizer:
                 else:
                     early_stopping_counter += 1
 
-                if early_stopping_counter >= 5:
+                if early_stopping_counter >= 10:
                     break
 
             return best_accuracy
 
         except Exception as e:
             logging.error (f"Trial {trial.number} failed: {str (e)}")
-            raise optuna.TrialPruned ()
+            return 0.0  # Return a low score instead of pruning
 
     def train_epoch (self, model, train_loader, optimizer, criterion, gradient_clip):
-        """CUDA-optimized training loop with mixed precision."""
+        """Train for one epoch."""
         model.train ()
         total_loss = 0.0
 
         for batch in train_loader:
-            # Move data to GPU efficiently
             audio = batch['audio'].cuda (non_blocking=True)
             image = batch['image'].cuda (non_blocking=True)
             text = batch['text'].cuda (non_blocking=True)
             targets = batch['emotion'].cuda (non_blocking=True)
 
-            # Clear gradients
             optimizer.zero_grad (set_to_none=True)
-
-            # Mixed precision forward pass
             with torch.amp.autocast ('cuda'):
                 outputs = model (audio, image, text)
                 loss = criterion (outputs, targets)
 
-            # Scaled backpropagation
             self.scaler.scale (loss).backward ()
-
-            if gradient_clip > 0:
-                self.scaler.unscale_ (optimizer)
-                torch.nn.utils.clip_grad_norm_ (model.parameters (), gradient_clip)
-
+            self.scaler.unscale_ (optimizer)
+            torch.nn.utils.clip_grad_norm_ (model.parameters (), gradient_clip)
             self.scaler.step (optimizer)
             self.scaler.update ()
 
@@ -241,7 +230,7 @@ class EnhancedHyperparameterOptimizer:
 
     @torch.no_grad ()
     def validate (self, model, val_loader, criterion):
-        """CUDA-optimized validation loop."""
+        """Validate for one epoch."""
         model.eval ()
         total_loss = 0.0
         correct = 0
@@ -262,131 +251,34 @@ class EnhancedHyperparameterOptimizer:
             correct += predicted.eq (targets).sum ().item ()
             total_loss += loss.item ()
 
-        return total_loss / len (val_loader), (correct / total if total > 0 else 0.0)
+        accuracy = correct / total if total > 0 else 0.0
+        return total_loss / len (val_loader), accuracy
 
-    def optimization_callback (self, study: optuna.Trial, trial: optuna.Trial):
-        """Callback function for optimization progress logging."""
-        if trial.number % 10 == 0:
-            self.visualize_optimization_results (study)
-            logging.info (f"\nTrial {trial.number} finished with state: {trial.state}")
-
-            completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-            if completed_trials:
-                logging.info (f"Current best value: {study.best_value}")
-                logging.info ("Current best params:")
-                for key, value in study.best_params.items ():
-                    logging.info (f"    {key}: {value}")
-            else:
-                logging.info ("No completed trials yet")
-
-    def visualize_optimization_results (self, study: optuna.Study):
-        """Create and save Optuna optimization plots."""
-        try:
-            completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-            if not completed_trials:
-                logging.info ("No completed trials yet, skipping visualization")
-                return
-
-            fig1 = plot_optimization_history (study)
-            fig2 = plot_parallel_coordinate (study)
-            fig3 = plot_param_importances (study)
-            fig4 = plot_contour (study)
-
-            fig1.write_image (str (self.viz_dir / 'optimization_history.png'))
-            fig2.write_image (str (self.viz_dir / 'parallel_coordinate.png'))
-            fig3.write_image (str (self.viz_dir / 'param_importances.png'))
-            fig4.write_image (str (self.viz_dir / 'param_contour.png'))
-        except Exception as e:
-            logging.error (f"Error in visualization: {str (e)}")
-
-    def save_trial_checkpoint (self, trial: optuna.Trial, model: nn.Module, accuracy: float):
-        """Save trial checkpoint for a given trial/model snapshot."""
-        checkpoint_path = self.viz_dir / f'trial_{trial.number}_acc_{accuracy:.3f}.pt'
-        torch.save ({
-            'trial_number': trial.number,
-            'model_state': model.state_dict (),
-            'trial_params': trial.params,
-            'accuracy': accuracy
-        }, checkpoint_path)
-        logging.info (f"Saved trial checkpoint: {checkpoint_path}")
-
-    def optimize_parallel (self) -> Dict[str, Any]:
-        """
-        Run parallel hyperparameter optimization.
-        Returns a dictionary of final optimization results.
-        """
-        storage = (optuna.storages.RDBStorage (
-            self.storage,
-            heartbeat_interval=60,
-            grace_period=120
-        ) if self.storage else None)
-
-        study = optuna.create_study (
-            direction="maximize",
-            pruner=HyperbandPruner (
-                min_resource=1,
-                max_resource=20,
-                reduction_factor=3,
-                bootstrap_count=0
-            ),
-            sampler=TPESampler (n_startup_trials=5, multivariate=True),
-            storage=storage,
-            load_if_exists=True
-        )
-
-        try:
-            # Run optimization
-            study.optimize (
-                self.objective,
-                n_trials=self.n_trials,
-                n_jobs=self.n_jobs,
-                timeout=None,
-                callbacks=[self.optimization_callback],
-                gc_after_trial=True,
-                catch=(Exception,)
-            )
-
-            # Check for completed trials
-            completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-            if completed_trials:
-                self.visualize_optimization_results (study)
-                return self.aggregate_results (study)
-            else:
-                logging.error ("No trials completed successfully. No optimal parameters were found.")
-                return {'error': 'No trials completed successfully'}
-
-        except Exception as e:
-            logging.error (f"Optimization failed: {str (e)}")
-            raise
+    def optimization_callback (self, study: optuna.Study, trial: optuna.Trial):
+        """Log trial progress."""
+        logging.info (f"Trial {trial.number} finished with value: {trial.value} and params: {trial.params}")
 
     def aggregate_results (self, study: optuna.Study) -> Dict[str, Any]:
-        """Aggregate final hyperparameter optimization results."""
+        """Aggregate results of the study."""
         completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
 
         if not completed_trials:
-            logging.error ("No completed trials found to aggregate results.")
-            return {'error': 'No completed trials found'}
-
-        durations = [
-            t.duration.total_seconds () for t in completed_trials if t.duration is not None
-        ]
+            logging.error ("No completed trials found.")
+            return {'error': 'No completed trials'}
 
         results = {
-            'best_params': study.best_params if study.best_trial else {},
-            'best_value': study.best_value if study.best_trial else None,
+            'best_params': study.best_params,
+            'best_value': study.best_value,
             'n_trials': len (study.trials),
-            'parameter_importance': optuna.importance.get_param_importances (study),
-            'trial_statistics': {
-                'mean_duration': np.mean (durations) if durations else 0,
-                'success_rate': len (completed_trials) / len (study.trials) if study.trials else 0,
-                'pruned_trials': len ([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]),
-                'failed_trials': len ([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL])
-            }
+            'completed_trials': len (completed_trials),
+            'pruned_trials': len ([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]),
+            'failed_trials': len ([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL])
         }
 
         # Save results
-        with open (self.viz_dir / 'optimization_results.json', 'w') as f:
-            json.dump (results, f, indent=4, default=str)
+        results_path = self.viz_dir / 'optimization_results.json'
+        with open (results_path, 'w') as f:
+            json.dump (results, f, indent=4)
+        logging.info (f"Optimization results saved to: {results_path}")
 
-        logging.info ("Optimization results successfully aggregated and saved.")
         return results
