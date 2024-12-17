@@ -261,9 +261,9 @@ def main():
         'batch_size': 32,
         'num_workers': 4,
         'learning_rate': 1e-4,
-        'weight_decay': 0.01,
+        'weight_decay': 0.1,
         'epochs': 50,
-        'patience': 5,
+        'patience': 20,
         'scheduler_patience': 2,
         'grad_clip': 1.0
     }
