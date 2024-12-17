@@ -303,23 +303,48 @@ class DatasetProcessor:
             return pd.DataFrame()
 
     def process_goemotions (self) -> pd.DataFrame:
-        """
-        Process GoEmotions dataset into a single CSV with [text, emotion, split].
-        """
+        """Process GoEmotions dataset with proper emotion mapping."""
         base_goemotions_path = self.base_path / 'GoEmotions' / 'archive-2' / 'data'
-        # The folder structure might differ in your setup; adapt as needed.
-        # Typically, there are train.tsv, dev.tsv, test.tsv files.
-
         all_data = []
 
         try:
+            # Create GoEmotions to standard emotion mapping
+            goemotions_mapping = {
+                # Anger group
+                'anger': 'angry', 'annoyance': 'angry', 'disapproval': 'angry',
+                # Disgust
+                'disgust': 'disgust',
+                # Fear group
+                'fear': 'fear', 'nervousness': 'fear',
+                # Joy/Happy group
+                'joy': 'happy', 'amusement': 'happy', 'approval': 'happy',
+                'excitement': 'happy', 'gratitude': 'happy', 'love': 'happy',
+                'optimism': 'happy', 'relief': 'happy', 'pride': 'happy',
+                'admiration': 'happy', 'desire': 'happy', 'caring': 'happy',
+                # Sadness group
+                'sadness': 'sad', 'disappointment': 'sad', 'embarrassment': 'sad',
+                'grief': 'sad', 'remorse': 'sad',
+                # Surprise group
+                'surprise': 'surprise', 'realization': 'surprise',
+                'confusion': 'surprise', 'curiosity': 'surprise',
+                # Neutral
+                'neutral': 'neutral'
+            }
+
+            # Load emotions list
+            emotions_file = base_goemotions_path / 'emotions.txt'
+            with open (emotions_file, 'r', encoding='utf-8') as f:
+                emotions_list = [line.strip () for line in f.readlines ()]
+
+            # Create index to emotion name mapping
+            idx_to_emotion = {i: emotion for i, emotion in enumerate (emotions_list)}
+
             for split in ['train', 'dev', 'test']:
                 tsv_path = base_goemotions_path / f'{split}.tsv'
                 if not tsv_path.exists ():
                     logging.error (f"GoEmotions: {tsv_path} not found.")
                     continue
 
-                # Each line typically: "text\tlabels"
                 with open (tsv_path, 'r', encoding='utf-8') as f:
                     lines = f.readlines ()
 
@@ -327,27 +352,32 @@ class DatasetProcessor:
                     parts = line.strip ().split ('\t')
                     if len (parts) < 2:
                         continue
+
                     text = parts[0]
                     labels = parts[1].split (',')
-                    # If multi-label, decide on a mapping to single label or skip multi-label logic.
-                    # For demonstration, pick the first label or map to 'emotion' if needed:
-                    emotion_id = int (labels[0])  # or do a more complex mapping.
 
-                    # Create a row
-                    all_data.append ({
-                        'text': text,
-                        'emotion': emotion_id,
-                        'split': 'train' if split == 'train' else 'test'
-                        # If you want dev to also be test or separate 'val', adapt as needed.
-                    })
+                    # Get the first emotion label
+                    emotion_idx = int (labels[0])
+                    emotion_name = idx_to_emotion[emotion_idx]
+
+                    # Map to standard emotion
+                    if emotion_name in goemotions_mapping:
+                        standard_emotion = goemotions_mapping[emotion_name]
+
+                        all_data.append ({
+                            'text': text,
+                            'emotion': self.emotion_mapping[standard_emotion],
+                            'split': 'train' if split == 'train' else 'test'
+                        })
 
             df = pd.DataFrame (all_data)
-            # Validate columns
             if not df.empty:
-                out_csv = self.processed_path / 'goemotions.csv'
-                df.to_csv (out_csv, index=False)
-                logging.info (f"Saved GoEmotions CSV to {out_csv}")
-                return df
+                # Add validation
+                if self.validate_dataset (df, "GoEmotions"):
+                    out_csv = self.processed_path / 'goemotions.csv'
+                    df.to_csv (out_csv, index=False)
+                    logging.info (f"Saved GoEmotions CSV to {out_csv}")
+                    return df
 
             return pd.DataFrame ()
 
