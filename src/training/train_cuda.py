@@ -56,18 +56,32 @@ class EmotionTrainer:
         self.log_dir = Path ('logs') / timestamp
         self.log_dir.mkdir (parents=True, exist_ok=True)
 
+        # Reset any existing handlers
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler (handler)
+
+        # Create log file path
+        log_file = self.log_dir / 'training.log'
+
         # Configure root logger
         logging.basicConfig (
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler (self.log_dir/'training.log'),
-                logging.StreamHandler ()  # This will also print to console
+                logging.FileHandler (log_file, mode='w', encoding='utf-8'),
+                logging.StreamHandler ()
             ]
         )
 
-        logging.info ("Started training session")
-        logging.info (f"Config: {self.config}")
+        # Log initial training information
+        logging.info (f"{'=' * 50}")
+        logging.info ("Training Session Started")
+        logging.info (f"Timestamp: {timestamp}")
+        logging.info (f"Log file: {log_file}")
+        logging.info (f"Configuration:")
+        for key, value in self.config.items ():
+            logging.info (f"  {key}: {value}")
+        logging.info (f"{'=' * 50}")
 
     def setup_directories (self):
         """Create necessary directories for saving results"""
@@ -104,21 +118,23 @@ class EmotionTrainer:
         early_stop_counter = 0
 
         for epoch in range (self.config['epochs']):
-            logging.info (f"\nEpoch {epoch + 1}/{self.config['epochs']}")
 
             # Training phase
             train_loss, train_metrics = self.train_epoch (train_loader, epoch)
-            logging.info (f"Training - Loss: {train_loss:.4f}, "
-                          f"Image Acc: {train_metrics['image_accuracy']:.4f}, "
-                          f"Audio Acc: {train_metrics['audio_accuracy']:.4f}, "
-                          f"Fusion Acc: {train_metrics['fusion_accuracy']:.4f}")
+            logging.info (f"\n{'-' * 20} Epoch {epoch + 1}/{self.config['epochs']} {'-' * 20}")
+            logging.info ("Training Phase:")
+            logging.info (f"  Loss: {train_loss:.4f}")
+            logging.info (f"  Image Accuracy: {train_metrics['image_accuracy']:.4f}")
+            logging.info (f"  Audio Accuracy: {train_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Fusion Accuracy: {train_metrics['fusion_accuracy']:.4f}")
 
             # Validation phase
             val_loss, val_metrics, predictions = self.validate (val_loader, epoch)
-            logging.info (f"Validation - Loss: {val_loss:.4f}, "
-                          f"Image Acc: {val_metrics['image_accuracy']:.4f}, "
-                          f"Audio Acc: {val_metrics['audio_accuracy']:.4f}, "
-                          f"Fusion Acc: {val_metrics['fusion_accuracy']:.4f}")
+            logging.info ("Validation Phase:")
+            logging.info (f"  Loss: {val_loss:.4f}")
+            logging.info (f"  Image Accuracy: {val_metrics['image_accuracy']:.4f}")
+            logging.info (f"  Audio Accuracy: {val_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Fusion Accuracy: {val_metrics['fusion_accuracy']:.4f}")
 
             # Update learning rate scheduler
             self.scheduler.step (val_loss)
@@ -130,8 +146,9 @@ class EmotionTrainer:
             # Log GPU memory usage
             memory_allocated = torch.cuda.memory_allocated (0)
             memory_cached = torch.cuda.memory_reserved (0)
-            logging.info (f"GPU Memory: Allocated={memory_allocated / 1e9:.2f}GB, "
-                          f"Cached={memory_cached / 1e9:.2f}GB")
+            logging.info ("Resources:")
+            logging.info (f"  GPU Memory Allocated: {memory_allocated / 1e9:.2f}GB")
+            logging.info (f"  GPU Memory Cached: {memory_cached / 1e9:.2f}GB")
 
             # Check for improvement
             if val_metrics['fusion_accuracy'] > best_acc:
