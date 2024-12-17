@@ -153,7 +153,6 @@ class EmotionTrainer:
             audio = batch['audio'].cuda (non_blocking=True)
             image = batch['image'].cuda (non_blocking=True)
             targets = batch['emotion'].cuda (non_blocking=True)
-            print ("Targets (First Few Batches):", targets.cpu ().numpy ())
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
@@ -216,13 +215,20 @@ class EmotionTrainer:
                 audio = batch['audio'].cuda (non_blocking=True)
                 image = batch['image'].cuda (non_blocking=True)
                 targets = batch['emotion'].cuda (non_blocking=True)
-                print ("Targets in batch (validation):", targets.cpu ().numpy ())
 
                 with torch.amp.autocast(device_type='cuda'):
                     outputs = self.model(image=image, audio=audio)
                     loss = self.criterion (outputs, targets)
 
                 total_loss += loss.item ()
+                print ("### Debugging Image Predictions ###")
+                for i in range (len (targets)):
+                    print (f"Index {i}:")
+                    print (f"  True Label: {targets[i].item ()}")
+                    image_input = image[i].unsqueeze (0).cuda ()  # Single image input
+                    output = self.model (image=image_input, audio=None)  # Pass only the image
+                    predicted_label = output['image_pred'].argmax (1).item ()
+                    print (f"  Predicted Label: {predicted_label}")
 
                 for key in outputs:
                     pred = outputs[key].argmax (1).cpu ()
@@ -280,8 +286,8 @@ def main():
         'num_workers': 4,  # Adjust based on CPU cores
         'learning_rate': 1e-4,
         'weight_decay': 0.1,
-        'epochs': 50,
-        'patience': 10,
+        'epochs': 10,
+        'patience': 5,
         'scheduler_patience': 2,
         'grad_clip': 1.0,
         'pin_memory': True,
@@ -297,6 +303,7 @@ def main():
 
         audio_data = pd.read_csv('data/processed/ravdess.csv').sample(frac=1, random_state=42).reset_index(drop=True)
         goemotions_data = pd.read_csv('data/processed/goemotions.csv').sample(frac=1, random_state=42).reset_index(drop=True)
+
 
         # Create datasets
         train_dataset = MultiModalEmotionDataset(
@@ -340,11 +347,7 @@ def main():
         logging.error(f"Training error: {str(e)}")
         raise
 
-    print("### Training Set Class Distribution ###")
-    print(train_dataset.image_data['emotion'].value_counts())
 
-    print("### Validation Set Class Distribution ###")
-    print(val_dataset.image_data['emotion'].value_counts())
 
 
 if __name__ == '__main__':
