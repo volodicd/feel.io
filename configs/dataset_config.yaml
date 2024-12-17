@@ -1,0 +1,31 @@
+dataset:
+  name: "emotion_dataset"
+  data_dir: "/path/to/data"
+  train_csv: "train_data_final.csv"
+  val_csv: "val_data_final.csv"
+  test_csv: "test_data_final.csv"
+
+image_settings:
+  resize: [224, 224]            # Image resizing dimensions
+  normalize_mean: [0.5, 0.5, 0.5]
+  normalize_std: [0.5, 0.5, 0.5]
+  augmentations:
+    random_crop: true
+    random_flip: true
+    rotation_degree: 10
+
+audio_settings:
+  sample_rate: 16000
+  duration: 4                   # In seconds
+  n_mfcc: 40                    # Number of MFCC features
+  augmentations:
+    noise_injection: true
+    time_stretch: 1.2
+
+text_settings:
+  tokenizer: "bert-base-uncased"
+  max_length: 50                # Maximum sequence length
+
+batch_size: 32
+num_workers: 4                  # For DataLoader parallelism
+shuffle: true
