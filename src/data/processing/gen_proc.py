@@ -1,4 +1,7 @@
 # src/data/processing/dataset_processor.py
+"""
+Dataset processing script for multiple datasets.
+"""
 
 import os
 import pandas as pd
@@ -9,7 +12,6 @@ import json
 from PIL import Image
 from tqdm import tqdm
 import logging
-from typing import Dict, List, Optional
 
 class DatasetProcessor:
     """
@@ -44,29 +46,6 @@ class DatasetProcessor:
             'sad':      5,
             'surprise': 6
         }
-
-    def determine_celeba_emotion(self, row: pd.Series) -> str:
-        """
-        Determine emotion from CelebA attributes using rule-based mapping.
-        Args:
-            row: A row from the CelebA attributes dataset
-        Returns:
-            Detected emotion as a string
-        """
-        if row['Smiling'] > 0 and row['Young'] > 0:
-            return 'happy'
-        elif row['Arched_Eyebrows'] > 0 and (row['Angry_Looking'] > 0 or row['Frowning'] > 0):
-            return 'angry'
-        elif row['Sad'] > 0 or (row['Frowning'] > 0 and not row['Smiling'] > 0):
-            return 'sad'
-        elif row['Mouth_Slightly_Open'] > 0 and row['Arched_Eyebrows'] > 0:
-            return 'surprise'
-        elif row['Frowning'] > 0 and row['Narrow_Eyes'] > 0:
-            return 'fear'
-        elif row['Mouth_Slightly_Open'] < 0 and row['Frowning'] > 0:
-            return 'disgust'
-        else:
-            return 'neutral'
 
     def validate_dataset(self, df: pd.DataFrame, dataset_name: str) -> bool:
         """
@@ -157,6 +136,7 @@ class DatasetProcessor:
 
             df = pd.DataFrame(data)
             if self.validate_dataset(df, "FER2013"):
+                df = self.hybrid_balance(df)
                 out_csv = self.processed_path / 'fer2013.csv'
                 df.to_csv(out_csv, index=False)
                 logging.info(f"Saved FER2013 CSV to {out_csv}")
@@ -211,6 +191,7 @@ class DatasetProcessor:
 
             df = pd.DataFrame(data)
             if self.validate_dataset(df, "ExpW"):
+                df = self.hybrid_balance (df)
                 out_csv = self.processed_path / 'expw.csv'
                 df.to_csv(out_csv, index=False)
                 logging.info(f"Saved ExpW CSV to {out_csv}")
@@ -373,6 +354,45 @@ class DatasetProcessor:
         except Exception as e:
             logging.error (f"GoEmotions processing error: {str (e)}")
             return pd.DataFrame ()
+
+    def hybrid_balance (self, df: pd.DataFrame, target_column: str = 'emotion') -> pd.DataFrame:
+        """
+        Perform hybrid balancing: oversample minority classes and undersample majority classes.
+        Args:
+            df: Input DataFrame with the emotion column
+            target_column: Name of the column containing class labels
+
+        Returns:
+            A balanced DataFrame.
+        """
+        from sklearn.utils import resample
+
+        # Group by class
+        grouped = df.groupby (target_column)
+
+        # Determine max and min sample sizes
+        max_size = grouped.size ().max ()
+        min_size = grouped.size ().min ()
+
+        # Target number for hybrid balance (midpoint between min and max)
+        target_size = (max_size + min_size) // 2
+
+        balanced_data = []
+
+        for emotion, group in grouped:
+            if len (group) < target_size:
+                # Oversample minority class
+                oversampled = resample (group, replace=True, n_samples=target_size, random_state=42)
+                balanced_data.append (oversampled)
+            elif len (group) > target_size:
+                # Undersample majority class
+                undersampled = resample (group, replace=False, n_samples=target_size, random_state=42)
+                balanced_data.append (undersampled)
+            else:
+                balanced_data.append (group)
+
+        # Combine all balanced classes
+        return pd.concat (balanced_data).reset_index (drop=True)
 
 
 def main():
