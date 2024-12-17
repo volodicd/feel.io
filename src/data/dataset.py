@@ -72,10 +72,10 @@ class MultiModalEmotionDataset(Dataset):
 
     def __getitem__ (self, idx: int) -> Dict[str, torch.Tensor]:
         # Print debugging information for alignment check
-        print (f"Index {idx}")
-        print (f"Image Label: {self.image_data.iloc[idx]['emotion']}")
-        print (f"Audio Label: {self.audio_data.iloc[idx]['emotion']}")
-        print (f"Text Label: {self.text_data.iloc[idx]['emotion']}")
+        # print (f"Index {idx}")
+        # print (f"Image Label: {self.image_data.iloc[idx]['emotion']}")
+        # print (f"Audio Label: {self.audio_data.iloc[idx]['emotion']}")
+        # print (f"Text Label: {self.text_data.iloc[idx]['emotion']}")
 
         # Load image
         image_path = self.image_data.iloc[idx]['path']
