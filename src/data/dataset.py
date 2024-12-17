@@ -70,28 +70,34 @@ class MultiModalEmotionDataset(Dataset):
     def __len__(self):
         return min(len(self.image_data), len(self.audio_data), len(self.text_data))
 
-    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+    def __getitem__ (self, idx: int) -> Dict[str, torch.Tensor]:
+        # Print debugging information for alignment check
+        print (f"Index {idx}")
+        print (f"Image Label: {self.image_data.iloc[idx]['emotion']}")
+        print (f"Audio Label: {self.audio_data.iloc[idx]['emotion']}")
+        print (f"Text Label: {self.text_data.iloc[idx]['emotion']}")
+
         # Load image
         image_path = self.image_data.iloc[idx]['path']
-        image = self.augmentation.image_transform(Image.open(image_path).convert("RGB"))
+        image = self.augmentation.image_transform (Image.open (image_path).convert ("RGB"))
 
         # Load audio
         audio_path = self.audio_data.iloc[idx]['path']
-        waveform, sr = librosa.load(audio_path, sr=16000)
-        waveform = self._pad_audio(self.augmentation.augment_audio(waveform))
+        waveform, sr = librosa.load (audio_path, sr=16000)
+        waveform = self._pad_audio (self.augmentation.augment_audio (waveform))
 
         # Process text
         text = self.text_data.iloc[idx]['text']
-        text_tensor = self._pad_text(self.tokenizer(text))
+        text_tensor = self._pad_text (self.tokenizer (text))
 
         # Emotion label
         emotion = self.image_data.iloc[idx]['emotion']
 
         return {
             'image': image,
-            'audio': torch.tensor(waveform, dtype=torch.float32).unsqueeze(0),
+            'audio': torch.tensor (waveform, dtype=torch.float32).unsqueeze (0),
             'text': text_tensor,
-            'emotion': torch.tensor(emotion, dtype=torch.long)
+            'emotion': torch.tensor (emotion, dtype=torch.long)
         }
 
     def _pad_audio(self, waveform: np.ndarray) -> np.ndarray:
@@ -106,3 +112,6 @@ class MultiModalEmotionDataset(Dataset):
         else:
             tokens = tokens[:self.max_text_length]
         return torch.tensor(tokens, dtype=torch.long)
+
+
+

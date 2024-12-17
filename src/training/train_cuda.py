@@ -273,7 +273,7 @@ class EmotionTrainer:
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
 
-def main ():
+def main():
     # Configuration optimized for CUDA
     config = {
         'batch_size': 16,  # Increased for GPU
@@ -289,64 +289,66 @@ def main ():
     }
 
     try:
-        # Load datasets
-        image_data = pd.read_csv ('data/processed/fer2013.csv')
-        expw_data = pd.read_csv ('data/processed/expw.csv')
-        audio_data = pd.read_csv ('data/processed/ravdess.csv')
-        goemotions_data = pd.read_csv ('data/processed/goemotions.csv')
+        # Load and shuffle datasets independently
+        image_data = pd.concat([
+            pd.read_csv('data/processed/fer2013.csv').sample(frac=1, random_state=42),
+            pd.read_csv('data/processed/expw.csv').sample(frac=1, random_state=42)
+        ]).reset_index(drop=True)
 
-        # Combine image datasets
-        image_data = pd.concat ([
-            image_data,
-            expw_data,
-        ]).reset_index (drop=True)
+        audio_data = pd.read_csv('data/processed/ravdess.csv').sample(frac=1, random_state=42).reset_index(drop=True)
+        goemotions_data = pd.read_csv('data/processed/goemotions.csv').sample(frac=1, random_state=42).reset_index(drop=True)
 
         # Create datasets
-        train_dataset = MultiModalEmotionDataset (
+        train_dataset = MultiModalEmotionDataset(
             image_data=image_data,
             audio_data=audio_data,
             text_data=goemotions_data,
             split='train'
         )
 
-        val_dataset = MultiModalEmotionDataset (
+        val_dataset = MultiModalEmotionDataset(
             image_data=image_data,
             audio_data=audio_data,
             text_data=goemotions_data,
             split='test'
         )
 
-        # Create data loaders with CUDA optimization
-        train_loader = DataLoader (
+        # Data loaders
+        train_loader = DataLoader(
             train_dataset,
             batch_size=config['batch_size'],
-            sampler=RandomSampler(train_dataset),  # Ensures randomness in batch sampling
+            sampler=RandomSampler(train_dataset),  # Ensures shuffling
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
             persistent_workers=True
         )
 
-        val_loader = DataLoader (
+        val_loader = DataLoader(
             val_dataset,
             batch_size=config['batch_size'],
-            shuffle=False,
+            shuffle=False,  # No need to shuffle validation data
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
             persistent_workers=True
         )
 
         # Initialize and train
-        trainer = EmotionTrainer (config)
-        trainer.train (train_loader, val_loader)
+        trainer = EmotionTrainer(config)
+        trainer.train(train_loader, val_loader)
 
     except Exception as e:
-        logging.error (f"Training error: {str (e)}")
+        logging.error(f"Training error: {str(e)}")
         raise
-    print ("### Training Set Class Distribution ###")
-    print (train_dataset.image_data['emotion'].value_counts ())
 
-    print ("### Validation Set Class Distribution ###")
-    print (val_dataset.image_data['emotion'].value_counts ())
+    print("### Training Set Class Distribution ###")
+    print(train_dataset.image_data['emotion'].value_counts())
+
+    print("### Validation Set Class Distribution ###")
+    print(val_dataset.image_data['emotion'].value_counts())
+
+
+if __name__ == '__main__':
+    main()
 
 
 if __name__ == '__main__':
