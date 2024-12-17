@@ -283,7 +283,7 @@ class EmotionTrainer:
 def main ():
     # Configuration optimized for CUDA
     config = {
-        'batch_size': 32,  # Increased - most GPUs can handle this
+        'batch_size': 16,  # Increased - most GPUs can handle this
         'num_workers': 4,  # Keep this
         'learning_rate': 3e-4,  # Slightly higher to start
         'weight_decay': 0.01,  # Reduced to prevent over-regularization
