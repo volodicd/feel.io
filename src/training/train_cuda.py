@@ -152,6 +152,7 @@ class EmotionTrainer:
         predictions = {'image': [], 'audio': [], 'fusion': []}
         all_targets = []
 
+
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
         for batch in progress_bar:
             # Move data to GPU
@@ -161,7 +162,12 @@ class EmotionTrainer:
             print ("Batch Image Shape:", image.shape)  # Should be [B, 3, H, W]
             print ("Batch Audio Shape:", audio.shape)  # Should be [B, 1, T]
             print ("Batch Targets Shape:", targets.shape)
-
+            if epoch == 0 and len (all_targets) == 0:  # Print only once
+                print ("### Sample Debug Info ###")
+                print ("Targets (emotions):", targets.cpu ().numpy ())  # Labels
+                print ("Image Shape:", image.shape if image is not None else "None")  # Shape of image input
+                print ("Audio Shape:", audio.shape if audio is not None else "None")  # Shape of audio input
+                print ("Text Input:", batch.get ('text', 'None'))  # Text input if available
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
@@ -350,6 +356,11 @@ def main ():
     except Exception as e:
         logging.error (f"Training error: {str (e)}")
         raise
+    print ("### Training Set Class Distribution ###")
+    print (train_dataset.image_data['emotion'].value_counts ())
+
+    print ("### Validation Set Class Distribution ###")
+    print (val_dataset.image_data['emotion'].value_counts ())
 
 
 if __name__ == '__main__':
