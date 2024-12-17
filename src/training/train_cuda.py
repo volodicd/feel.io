@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, List, Optional
 from torch.utils.tensorboard import SummaryWriter
-
+from torch.utils.data import DataLoader, RandomSampler
 # Import from your project structure
 from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
@@ -168,6 +168,8 @@ class EmotionTrainer:
                 print ("Image Shape:", image.shape if image is not None else "None")  # Shape of image input
                 print ("Audio Shape:", audio.shape if audio is not None else "None")  # Shape of audio input
                 print ("Text Input:", batch.get ('text', 'None'))  # Text input if available
+            if epoch == 0:
+                print ("Targets (First Few Batches):", targets.cpu ().numpy ())
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
@@ -252,7 +254,7 @@ class EmotionTrainer:
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
             )
-
+        print ("Validation Outputs (Fusion):", outputs['fusion'].argmax (1).cpu ().numpy ()[:16])
         return metrics['loss'], metrics, predictions
 
     def save_checkpoint (self, epoch: int, metrics: Dict):
@@ -334,7 +336,7 @@ def main ():
         train_loader = DataLoader (
             train_dataset,
             batch_size=config['batch_size'],
-            shuffle=True,
+            sampler=RandomSampler(train_dataset),  # Ensures randomness in batch sampling
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
             persistent_workers=True
