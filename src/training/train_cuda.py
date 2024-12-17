@@ -226,7 +226,7 @@ class EmotionTrainer:
                 targets = batch['emotion'].cuda (non_blocking=True)
 
                 with torch.cuda.amp.autocast ():
-                    outputs = self.model (audio, image)
+                    outputs = self.model(image=image, audio=audio)
                     loss = self.criterion (outputs, targets)
 
                 total_loss += loss.item ()
