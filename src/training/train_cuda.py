@@ -285,8 +285,8 @@ def main ():
     config = {
         'batch_size': 16,  # Increased - most GPUs can handle this
         'num_workers': 4,  # Keep this
-        'learning_rate': 3e-4,  # Slightly higher to start
-        'weight_decay': 0.01,  # Reduced to prevent over-regularization
+        'learning_rate': 1e-4,  # Slightly higher to start
+        'weight_decay': 0.005,  # Reduced to prevent over-regularization
         'epochs': 30,  # Increased to give more training time
         'patience': 7,  # Increased slightly
         'scheduler_patience': 3,  # Increased slightly
