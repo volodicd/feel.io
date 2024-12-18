@@ -222,11 +222,13 @@ class ImprovedEmotionModel(nn.Module):
 
         # Stack only available features
         if len (features) > 0:
-            fused_features = torch.stack (features, dim=1)  # Stack available modalities: [B, num_features, 256]
-            fused, attention_weights = self.cross_attention (fused_features, fused_features, fused_features)  # Cross-attention
-            fusion_features = (fused * attention_weights).sum (dim=1)  # [B, 256]        # Mean-pooling: [B, 256]
-            if len (features) == len (fused_features):
-                fusion_features = fusion_features + torch.mean (torch.stack (features), dim=0)
+            fused_features = torch.stack (features, dim=1)  # [B, num_features, 256]
+            # Modified fusion section
+            fused, _ = self.cross_attention (fused_features, fused_features, fused_features)
+            fusion_features = fused.mean (dim=1)  # [B, 256]
+
+            # Add residual connection
+            fusion_features = fusion_features + torch.mean (torch.stack (features), dim=0)
         else:
             fusion_features = zero_features
 
