@@ -13,7 +13,7 @@ from src.models.components.attention import MultiHeadAttention
 class ImprovedEmotionModel(nn.Module):
     """
     Multimodal emotion recognition model combining audio, image, and text inputs.
-    Uses CNN-based encoders for image/audio, an RNN-based encoder for text (from scratch),
+    Uses CNN-based encoders for image/audio, an RNN-based encoder for text,
     and an attention mechanism for final fusion.
     """
 
@@ -32,14 +32,28 @@ class ImprovedEmotionModel(nn.Module):
         # -------------------------------------------------------------
         # 1. Image Encoder
         # -------------------------------------------------------------
-        self.image_encoder = nn.Sequential(
-            ResidualBlock(3, 64, stride=1),
-            nn.MaxPool2d(2),
-            ResidualBlock(64, 128, stride=1),
-            nn.MaxPool2d(2),
-            ResidualBlock(128, 256, stride=1),
-            nn.MaxPool2d(2),
-            nn.AdaptiveAvgPool2d((1, 1))
+        self.image_encoder = nn.Sequential (
+            ResidualBlock (3, 64, stride=1),
+            nn.MaxPool2d (2),
+            nn.Dropout (0.2),  # Add dropout after pooling
+
+            ResidualBlock (64, 128, stride=1),
+            nn.MaxPool2d (2),
+            nn.Dropout (0.2),
+
+            ResidualBlock (128, 256, stride=1),
+            nn.MaxPool2d (2),
+            nn.Dropout (0.3),
+
+            ResidualBlock (256, 512, stride=1),  # Add one more layer
+            nn.MaxPool2d (2),
+            nn.Dropout (0.4),
+
+            nn.AdaptiveAvgPool2d ((1, 1)),
+            nn.Flatten (),  # Add explicit flatten
+            nn.Linear (512, 256),  # Project down to match other features
+            nn.ReLU (),
+            nn.Dropout (0.5)
         )
 
         # -------------------------------------------------------------
@@ -53,7 +67,7 @@ class ImprovedEmotionModel(nn.Module):
         )
 
         # -------------------------------------------------------------
-        # 3. Text Encoder (from scratch, no pretrained)
+        # 3. Text Encoder
         # -------------------------------------------------------------
         # We define an Embedding + Bidirectional LSTM (or GRU).
         self.embed_dim = embed_dim
@@ -147,7 +161,7 @@ class ImprovedEmotionModel(nn.Module):
 
         # Placeholder features for missing modalities
         batch_size = 1  # Default batch size
-        device = torch.device ("cpu")
+        device = torch.device("cpu")
 
         if image is not None:
             batch_size = image.size (0)
@@ -159,15 +173,15 @@ class ImprovedEmotionModel(nn.Module):
             batch_size = text_input.size (0)
             device = text_input.device
 
-        zero_features = torch.zeros ((batch_size, 256), device=device)
+        zero_features = torch.zeros((batch_size, 256), device=device)
 
         # ---------------------------------------------------------
         # 1. Encode Image (if provided)
         # ---------------------------------------------------------
         if image is not None:
-            image_features = self.image_encoder (image)  # [B, 256, 1, 1]
-            image_features = image_features.squeeze (-1).squeeze (-1)  # [B, 256]
-            image_pred = self.classifiers['image'] (image_features)
+            image_features = self.image_encoder(image)  # [B, 256, 1, 1]
+            image_features = image_features.squeeze(-1).squeeze (-1)  # [B, 256]
+            image_pred = self.classifiers['image'](image_features)
             predictions['image_pred'] = image_pred
         else:
             image_features = zero_features  # Replace with zeros if image is missing
@@ -176,8 +190,8 @@ class ImprovedEmotionModel(nn.Module):
         # 2. Encode Audio (if provided)
         # ---------------------------------------------------------
         if audio is not None:
-            audio_features = self.audio_encoder (audio).squeeze (-1)  # [B, 256]
-            audio_pred = self.classifiers['audio'] (audio_features)
+            audio_features = self.audio_encoder(audio).squeeze (-1)  # [B, 256]
+            audio_pred = self.classifiers['audio'](audio_features)
             predictions['audio_pred'] = audio_pred
         else:
             audio_features = zero_features  # Replace with zeros if audio is missing
@@ -200,17 +214,19 @@ class ImprovedEmotionModel(nn.Module):
         # ---------------------------------------------------------
         features = []
         if image is not None:
-            features.append (image_features)
+            features.append(image_features)
         if audio is not None:
-            features.append (audio_features)
+            features.append(audio_features)
         if text_input is not None:
-            features.append (text_features)
+            features.append(text_features)
 
         # Stack only available features
         if len (features) > 0:
             fused_features = torch.stack (features, dim=1)  # Stack available modalities: [B, num_features, 256]
-            fused, _ = self.cross_attention (fused_features, fused_features, fused_features)  # Cross-attention
-            fusion_features = fused.mean (dim=1)  # Mean-pooling: [B, 256]
+            fused, attention_weights = self.cross_attention (fused_features, fused_features, fused_features)  # Cross-attention
+            fusion_features = (fused * attention_weights).sum (dim=1)  # [B, 256]        # Mean-pooling: [B, 256]
+            if len (features) == len (fused_features):
+                fusion_features = fusion_features + torch.mean (torch.stack (features), dim=0)
         else:
             fusion_features = zero_features
 
@@ -235,7 +251,7 @@ class MultiModalLoss(nn.Module):
         super().__init__()
         self.criterion = nn.CrossEntropyLoss()
         # Default if user doesn't provide weights for text
-        self.weights = weights or {'image': 0.25, 'audio': 0.25, 'text': 0.25, 'fusion': 0.25}
+        self.weights = weights or {'image': 0.35, 'audio': 0.20, 'text': 0.20, 'fusion': 0.25}
 
         if not np.isclose(sum(self.weights.values()), 1.0):
             raise ValueError("Loss weights must sum to 1")

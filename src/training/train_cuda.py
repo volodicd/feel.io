@@ -315,12 +315,12 @@ def main ():
     config = {
         'batch_size': 16,  # Increased - most GPUs can handle this
         'num_workers': 4,  # Keep this
-        'learning_rate': 1e-4,  # Slightly higher to start
-        'weight_decay': 0.005,  # Reduced to prevent over-regularization
-        'epochs': 30,  # Increased to give more training time
-        'patience': 7,  # Increased slightly
-        'scheduler_patience': 3,  # Increased slightly
-        'grad_clip': 1.0,  # Keep this
+        'learning_rate': 2e-4,  # Slightly higher to start
+        'weight_decay': 0.001,  # Reduced to prevent over-regularization
+        'epochs': 50,  # Increased to give more training time
+        'patience': 15,  # Increased slightly
+        'scheduler_patience': 5,  # Increased slightly
+        'grad_clip': 0.5,  # Keep this
         'pin_memory': True,  # Keep this
         'cuda_non_blocking': True  # Keep this
     }
