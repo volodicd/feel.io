@@ -33,25 +33,35 @@ class ImprovedEmotionModel(nn.Module):
         # 1. Image Encoder
         # -------------------------------------------------------------
         self.image_encoder = nn.Sequential (
-            ResidualBlock (3, 64, stride=1),
-            nn.MaxPool2d (2),
-            nn.Dropout (0.2),  # Add dropout after pooling
-
-            ResidualBlock (64, 128, stride=1),
+            # Initial large kernel to capture more spatial information
+            nn.Conv2d (3, 128, kernel_size=7, stride=2, padding=3),
+            nn.BatchNorm2d (128),
+            nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.2),
 
             ResidualBlock (128, 256, stride=1),
+            nn.BatchNorm2d (256),
+            nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.3),
 
-            ResidualBlock (256, 512, stride=1),  # Add one more layer
+            ResidualBlock (256, 512, stride=1),
+            nn.BatchNorm2d (512),
+            nn.ReLU (),
+            nn.MaxPool2d (2),
+            nn.Dropout (0.4),
+
+            ResidualBlock (512, 512, stride=1),
+            nn.BatchNorm2d (512),
+            nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.4),
 
             nn.AdaptiveAvgPool2d ((1, 1)),
-            nn.Flatten (),  # Add explicit flatten
-            nn.Linear (512, 256),  # Project down to match other features
+            nn.Flatten (),
+            nn.Linear (512, 256),
+            nn.BatchNorm1d (256),
             nn.ReLU (),
             nn.Dropout (0.5)
         )
@@ -223,12 +233,14 @@ class ImprovedEmotionModel(nn.Module):
         # Stack only available features
         if len (features) > 0:
             fused_features = torch.stack (features, dim=1)  # [B, num_features, 256]
+            fused_features = nn.LayerNorm (256).to (device) (fused_features)
             # Modified fusion section
             fused, _ = self.cross_attention (fused_features, fused_features, fused_features)
-            fusion_features = fused.mean (dim=1)  # [B, 256]
+            fusion_features = fused.mean (dim=1)
+            feature_weights = torch.softmax (torch.randn (len (features)).to (device), dim=0)
+            weighted_features = torch.stack ([feat * w for feat, w in zip (features, feature_weights)])
+            fusion_features = fusion_features + weighted_features.mean (dim=0)
 
-            # Add residual connection
-            fusion_features = fusion_features + torch.mean (torch.stack (features), dim=0)
         else:
             fusion_features = zero_features
 
