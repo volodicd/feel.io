@@ -33,30 +33,38 @@ class ImprovedEmotionModel(nn.Module):
         # 1. Image Encoder
         # -------------------------------------------------------------
         self.image_encoder = nn.Sequential (
-            # Initial large kernel to capture more spatial information
-            nn.Conv2d (3, 128, kernel_size=7, stride=2, padding=3),
-            nn.BatchNorm2d (128),
+            # Initial feature extraction
+            nn.Conv2d (3, 64, kernel_size=5, stride=1, padding=2),
+            nn.BatchNorm2d (64),
             nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.2),
 
-            ResidualBlock (128, 256, stride=1),
-            nn.BatchNorm2d (256),
+            # First block - increase channels
+            nn.Conv2d (64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d (128),
+            nn.ReLU (),
+            nn.Conv2d (128, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d (128),
             nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.3),
 
-            ResidualBlock (256, 512, stride=1),
-            nn.BatchNorm2d (512),
+            # Second block - extract emotion features
+            nn.Conv2d (128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d (256),
+            nn.ReLU (),
+            nn.Conv2d (256, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d (256),
             nn.ReLU (),
             nn.MaxPool2d (2),
             nn.Dropout (0.4),
 
-            ResidualBlock (512, 512, stride=1),
+            # Global features
+            nn.Conv2d (256, 512, kernel_size=3, padding=1),
             nn.BatchNorm2d (512),
             nn.ReLU (),
             nn.MaxPool2d (2),
-            nn.Dropout (0.4),
 
             nn.AdaptiveAvgPool2d ((1, 1)),
             nn.Flatten (),

@@ -313,16 +313,16 @@ class EmotionTrainer:
 def main ():
     # Configuration optimized for CUDA
     config = {
-        'batch_size': 12,  # Increased - most GPUs can handle this
-        'num_workers': 4,  # Keep this
-        'learning_rate': 2e-4,  # Slightly higher to start
-        'weight_decay': 0.001,  # Reduced to prevent over-regularization
-        'epochs': 50,  # Increased to give more training time
-        'patience': 15,  # Increased slightly
-        'scheduler_patience': 5,  # Increased slightly
-        'grad_clip': 0.5,  # Keep this
-        'pin_memory': True,  # Keep this
-        'cuda_non_blocking': True  # Keep this
+        'batch_size': 64,  # Larger batch size
+        'num_workers': 8,  # More workers for data loading
+        'learning_rate': 1e-3,  # Higher initial learning rate
+        'weight_decay': 1e-4,  # Adjusted weight decay
+        'epochs': 100,  # More epochs
+        'patience': 15,  # Keep current patience
+        'scheduler_patience': 5,
+        'grad_clip': 1.0,
+        'pin_memory': True,
+        'cuda_non_blocking': True
     }
 
     try:
