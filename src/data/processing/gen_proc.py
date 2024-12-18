@@ -3,7 +3,6 @@
 Dataset processing script for multiple datasets.
 """
 
-import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -47,7 +46,7 @@ class DatasetProcessor:
             'surprise': 6
         }
 
-    def validate_dataset (self, df: pd.DataFrame, dataset_name: str) -> bool:
+    def validate_dataset(self, df: pd.DataFrame, dataset_name: str) -> bool:
         """
         Validate processed dataset for completeness and correctness.
         """
@@ -61,41 +60,41 @@ class DatasetProcessor:
             # Verify required columns exist
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
-                logging.error (f"{dataset_name}: Missing columns: {missing_cols}")
+                logging.error(f"{dataset_name}: Missing columns: {missing_cols}")
                 return False
 
             # Verify emotion values are valid
-            invalid_emotions = df[~df['emotion'].isin (range (7))]
+            invalid_emotions = df[~df['emotion'].isin(range(7))]
             if not invalid_emotions.empty:
-                logging.error (f"{dataset_name}: Found {len (invalid_emotions)} invalid emotion values")
+                logging.error(f"{dataset_name}: Found {len (invalid_emotions)} invalid emotion values")
                 return False
 
             # Check file existence only for datasets with paths
             if 'path' in df.columns:
                 invalid_files = 0
-                for _, row in df.iterrows ():
-                    if not Path (row['path']).exists ():
+                for _, row in df.iterrows():
+                    if not Path(row['path']).exists():
                         invalid_files += 1
 
                 if invalid_files > 0:
-                    logging.warning (f"{dataset_name}: {invalid_files} files not found")
+                    logging.warning(f"{dataset_name}: {invalid_files} files not found")
 
             # Log split distribution
-            split_dist = df['split'].value_counts ()
-            logging.info (f"{dataset_name} split distribution: {split_dist.to_dict ()}")
-            emotion_dist = df['emotion'].value_counts ()
+            split_dist = df['split'].value_counts()
+            logging.info(f"{dataset_name} split distribution: {split_dist.to_dict()}")
+            emotion_dist = df['emotion'].value_counts()
             logging.info (f"{dataset_name} emotion distribution:\n{emotion_dist}")
 
             # Check for potential class imbalance
-            min_samples = emotion_dist.min ()
-            max_samples = emotion_dist.max ()
+            min_samples = emotion_dist.min()
+            max_samples = emotion_dist.max()
             if min_samples > 0 and (max_samples / min_samples > 10):
-                logging.warning (f"{dataset_name}: High class imbalance detected")
+                logging.warning(f"{dataset_name}: High class imbalance detected")
 
             return True
 
         except Exception as e:
-            logging.error (f"Validation error for {dataset_name}: {str (e)}")
+            logging.error(f"Validation error for {dataset_name}: {str (e)}")
             return False
 
     def process_fer2013(self) -> pd.DataFrame:
@@ -113,7 +112,7 @@ class DatasetProcessor:
                 for emotion in tqdm(self.emotion_mapping.keys(), desc=f"Processing FER2013 {split}"):
                     emotion_path = split_path / emotion
                     if not emotion_path.exists():
-                        # Maybe just skip if the subfolder is missing
+                        # just skip if the subfolder is missing
                         continue
 
                     for img_path in emotion_path.glob('*.jpg'):
@@ -185,7 +184,7 @@ class DatasetProcessor:
 
             df = pd.DataFrame(data)
             if self.validate_dataset(df, "ExpW"):
-                df = self.hybrid_balance (df)
+                df = self.hybrid_balance(df)
                 out_csv = self.processed_path / 'expw.csv'
                 df.to_csv(out_csv, index=False)
                 logging.info(f"Saved ExpW CSV to {out_csv}")
@@ -196,6 +195,8 @@ class DatasetProcessor:
             logging.error(f"ExpW processing error: {str(e)}")
             return pd.DataFrame()
 
+
+# Unused func (dataset was delete due to the lack of time)
     def process_celeba(self) -> pd.DataFrame:
         """Process CelebA dataset with improved emotion mapping."""
         celeba_path = self.base_path / 'CelebA'
@@ -222,12 +223,12 @@ class DatasetProcessor:
                         continue
 
                     # Determine emotion using complex rules
-                    emotion = self.determine_celeba_emotion(row)
+                    # emotion = self.determine_celeba_emotion(row) deleted dataset
                     split = 'train' if partition_df.iloc[idx]['partition'] == 0 else 'test'
 
                     data.append({
                         'path':    str(image_path),
-                        'emotion': self.emotion_mapping[emotion],
+                        # 'emotion': self.emotion_mapping[emotion],
                         'split':   split
                     })
                 except Exception as e:
@@ -296,7 +297,7 @@ class DatasetProcessor:
             logging.error(f"RAVDESS processing error: {str(e)}")
             return pd.DataFrame()
 
-    def process_goemotions (self) -> pd.DataFrame:
+    def process_goemotions(self) -> pd.DataFrame:
         """Process GoEmotions dataset with proper emotion mapping."""
         base_goemotions_path = self.base_path / 'GoEmotions' / 'archive-2' / 'data'
         all_data = []
@@ -327,23 +328,23 @@ class DatasetProcessor:
 
             # Load emotions list
             emotions_file = base_goemotions_path / 'emotions.txt'
-            with open (emotions_file, 'r', encoding='utf-8') as f:
-                emotions_list = [line.strip () for line in f.readlines ()]
+            with open(emotions_file, 'r', encoding='utf-8') as f:
+                emotions_list = [line.strip() for line in f.readlines()]
 
-            # Create index to emotion name mapping
+            idx_to_emotion = {i: emotion for i, emotion in enumerate(emotions_list)}
             idx_to_emotion = {i: emotion for i, emotion in enumerate (emotions_list)}
 
             for split in ['train', 'dev', 'test']:
                 tsv_path = base_goemotions_path / f'{split}.tsv'
-                if not tsv_path.exists ():
-                    logging.error (f"GoEmotions: {tsv_path} not found.")
+                if not tsv_path.exists():
+                    logging.error(f"GoEmotions: {tsv_path} not found.")
                     continue
 
-                with open (tsv_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines ()
+                with open(tsv_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
 
-                for line in tqdm (lines, desc=f"Processing GoEmotions {split}"):
-                    parts = line.strip ().split ('\t')
+                for line in tqdm(lines, desc=f"Processing GoEmotions {split}"):
+                    parts = line.strip().split('\t')
                     if len (parts) < 2:
                         continue
 
@@ -351,20 +352,20 @@ class DatasetProcessor:
                     labels = parts[1].split (',')
 
                     # Get the first emotion label
-                    emotion_idx = int (labels[0])
+                    emotion_idx = int(labels[0])
                     emotion_name = idx_to_emotion[emotion_idx]
 
                     # Map to standard emotion
                     if emotion_name in goemotions_mapping:
                         standard_emotion = goemotions_mapping[emotion_name]
 
-                        all_data.append ({
+                        all_data.append({
                             'text': text,
                             'emotion': self.emotion_mapping[standard_emotion],
                             'split': 'train' if split == 'train' else 'test'
                         })
 
-            df = pd.DataFrame (all_data)
+            df = pd.DataFrame(all_data)
             if not df.empty:
                 # Add validation
                 if self.validate_dataset (df, "GoEmotions"):
@@ -379,7 +380,7 @@ class DatasetProcessor:
             logging.error (f"GoEmotions processing error: {str (e)}")
             return pd.DataFrame ()
 
-    def hybrid_balance (self, df: pd.DataFrame, target_column: str = 'emotion') -> pd.DataFrame:
+    def hybrid_balance(self, df: pd.DataFrame, target_column: str = 'emotion') -> pd.DataFrame:
         """
         Perform hybrid balancing: oversample minority classes and undersample majority classes.
         Args:
@@ -392,11 +393,11 @@ class DatasetProcessor:
         from sklearn.utils import resample
 
         # Group by class
-        grouped = df.groupby (target_column)
+        grouped = df.groupby(target_column)
 
         # Determine max and min sample sizes
-        max_size = grouped.size ().max ()
-        min_size = grouped.size ().min ()
+        max_size = grouped.size().max()
+        min_size = grouped.size().min()
 
         # Target number for hybrid balance (midpoint between min and max)
         target_size = (max_size + min_size) // 2
@@ -404,19 +405,19 @@ class DatasetProcessor:
         balanced_data = []
 
         for emotion, group in grouped:
-            if len (group) < target_size:
+            if len(group) < target_size:
                 # Oversample minority class
-                oversampled = resample (group, replace=True, n_samples=target_size, random_state=42)
-                balanced_data.append (oversampled)
-            elif len (group) > target_size:
+                oversampled = resample(group, replace=True, n_samples=target_size, random_state=42)
+                balanced_data.append(oversampled)
+            elif len(group) > target_size:
                 # Undersample majority class
-                undersampled = resample (group, replace=False, n_samples=target_size, random_state=42)
-                balanced_data.append (undersampled)
+                undersampled = resample(group, replace=False, n_samples=target_size, random_state=42)
+                balanced_data.append(undersampled)
             else:
-                balanced_data.append (group)
+                balanced_data.append(group)
 
         # Combine all balanced classes
-        return pd.concat (balanced_data).reset_index (drop=True)
+        return pd.concat(balanced_data).reset_index(drop=True)
 
 
 def main():

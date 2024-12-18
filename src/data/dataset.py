@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
-from pathlib import Path
 from PIL import Image
 import librosa
 import torchvision.transforms as T
@@ -79,16 +78,16 @@ class MultiModalEmotionDataset(Dataset):
 
         # Load image
         image_path = self.image_data.iloc[idx]['path']
-        image = self.augmentation.image_transform (Image.open (image_path).convert ("RGB"))
+        image = self.augmentation.image_transform(Image.open (image_path).convert ("RGB"))
 
         # Load audio
         audio_path = self.audio_data.iloc[idx]['path']
-        waveform, sr = librosa.load (audio_path, sr=16000)
-        waveform = self._pad_audio (self.augmentation.augment_audio (waveform))
+        waveform, sr = librosa.load(audio_path, sr=16000)
+        waveform = self._pad_audio(self.augmentation.augment_audio (waveform))
 
         # Process text
         text = self.text_data.iloc[idx]['text']
-        text_tensor = self._pad_text (self.tokenizer (text))
+        text_tensor = self._pad_text(self.tokenizer (text))
 
         # Emotion label
         emotion = self.image_data.iloc[idx]['emotion']
