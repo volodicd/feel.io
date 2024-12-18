@@ -204,6 +204,7 @@ class EnhancedHyperparameterOptimizer:
 
     def train_epoch (self, model, train_loader, optimizer, criterion, gradient_clip):
         """Train for one epoch."""
+        torch.cuda.empty_cache()
         model.train ()
         total_loss = 0.0
 
