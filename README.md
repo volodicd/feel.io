@@ -41,13 +41,13 @@ The approximate realization time is 3-4 months.
 ## Detailed Project Plan:
 
 - **Datasets analysis** – Finding the most combinable datasets and combining them: 2 weeks.
-- **Data preprocessing** – Cleaning and normalizing datasets: 2-3 weeks. (🚧)
+- **Data preprocessing** – Cleaning and normalizing datasets: 2-3 weeks. 
 - **Model design and build** 
   - Design and build image processing model: 2-3 weeks 
   - Design and build sound processing model: 1-2 weeks
 - **Apply transfer learning**: 1 week
 - **Optimization and checking for possible problems**: 1 week
-- **Training on multiple datasets**: 3 weeks
+- **Training on multiple datasets**: 3 weeks (🚧)
 - **Fine-tuning the network**: Optimizing the model: 2 weeks 
 - **App development**: 1 week
 - **Writing final report**: 2 weeks
@@ -57,5 +57,8 @@ The approximate realization time is 3-4 months.
 
 1. [Gabor filter](https://www.sciencedirect.com/science/article/abs/pii/S0045790621001890)
 2. A CNN-LSTM Based Deep Neural Networks for Facial Emotion Detection in Videos - Arnold Sachith A Hans
+3. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "Context based emotion recognition using emotic dataset." IEEE transactions on pattern analysis and machine intelligence 42, no. 11 (2019): 2755-2766.
+4. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "Emotion recognition in context." In Proceedings of the IEEE conference on computer vision and pattern recognition, pp. 1667-1675. 2017.
+5. Kosti, Ronak, Jose M. Alvarez, Adria Recasens, and Agata Lapedriza. "EMOTIC: Emotions in Context dataset." In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition Workshops, pp. 61-69. 2017.
 
 

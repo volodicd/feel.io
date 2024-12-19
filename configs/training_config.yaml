@@ -1,0 +1,28 @@
+training:
+  epochs: 50
+  batch_size: 32
+  early_stopping: true
+  patience: 5
+
+optimizer:
+  type: "AdamW"
+  learning_rate: 0.0005
+  weight_decay: 0.01
+  scheduler:
+    type: "ReduceLROnPlateau"
+    factor: 0.5
+    patience: 3
+
+loss:
+  name: "CrossEntropyLoss"
+  class_weights: [1.0, 1.0, 1.2, 0.8, 1.5]  # Balancing class weights
+
+logging:
+  log_dir: "./logs"
+  save_best_model: true
+  checkpoint_dir: "./checkpoints"
+  tensorboard: true
+
+mixed_precision: true     # Enable AMP (Automatic Mixed Precision)
+gradient_clipping: 1.0
+seed: 42

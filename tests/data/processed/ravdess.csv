@@ -1,0 +1,15 @@
+path,emotion,actor,intensity,split
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-07-01-01-01-02.wav,1,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-01-01-01-01-02.wav,4,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-06-01-01-01-02.wav,6,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-03-01-01-01-02.wav,5,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-04-01-01-01-02.wav,0,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-05-01-01-01-02.wav,2,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_02/03-01-02-01-01-01-02.wav,3,2,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-07-01-01-01-01.wav,1,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-01-01-01-01-01.wav,4,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-06-01-01-01-01.wav,6,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-03-01-01-01-01.wav,5,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-04-01-01-01-01.wav,0,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-05-01-01-01-01.wav,2,1,01,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmp6n_39wl6/data/raw/RAVDESS/audio_speech_actors_01-24/Actor_01/03-01-02-01-01-01-01.wav,3,1,01,train

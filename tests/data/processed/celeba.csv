@@ -1,0 +1,3 @@
+path,emotion,split
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpj5x8tz22/data/raw/CelebA/images/000001.jpg,3,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpj5x8tz22/data/raw/CelebA/images/000002.jpg,0,test

@@ -1,0 +1,8 @@
+path,emotion,split
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_0.jpg,0,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_1.jpg,1,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_2.jpg,2,test
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_3.jpg,3,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_4.jpg,5,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_5.jpg,6,train
+/var/folders/z9/qfsmj2ss4b102r8kgzvg6mh00000gn/T/tmpy7_xri3b/data/raw/ExpW/images/image_6.jpg,4,train
