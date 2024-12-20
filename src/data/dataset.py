@@ -9,10 +9,10 @@ import random
 from typing import Dict
 import mediapipe as mp
 
-import mediapipe as mp
-
 
 class EmotionAugmentation:
+    """Data augmentation for emotion recognition"""
+
     def __init__ (self, split='train'):
         self.split = split
         self.face_detector = mp.solutions.face_detection.FaceDetection (
@@ -28,6 +28,7 @@ class EmotionAugmentation:
                 T.ToTensor (),
                 T.Normalize ([0.5], [0.5])
             ])
+            self.audio_params = {'pitch_shift': (-2, 2), 'speed_change': (0.9, 1.1), 'noise_factor': 0.005}
         else:
             self.image_transform = T.Compose ([
                 T.Grayscale (num_output_channels=1),
@@ -35,6 +36,7 @@ class EmotionAugmentation:
                 T.ToTensor (),
                 T.Normalize ([0.5], [0.5])
             ])
+            self.audio_params = None
 
     def process_image (self, image_path):
         # Load image
@@ -71,44 +73,20 @@ class EmotionAugmentation:
         # If no face detected, process whole image
         return self.image_transform (image)
 
-class EmotionAugmentation:
-    """Data augmentation for emotion recognition"""
-
-    def __init__(self, split='train'):
-        self.split = split
-        if split == 'train':
-            self.image_transform = T.Compose([
-                T.Grayscale (num_output_channels=1),  # Emotion works better with grayscale
-                T.Resize ((48, 48)),  # Standard size for emotion detection
-                T.RandomHorizontalFlip (p=0.5),
-                T.RandomAffine (degrees=5, translate=(0.05, 0.05)),  # Reduced intensity
-                T.ToTensor (),
-                T.Normalize ([0.5], [0.5])  # Simpler normalization for grayscale
-            ])
-            self.audio_params = {'pitch_shift': (-2, 2), 'speed_change': (0.9, 1.1), 'noise_factor': 0.005}
-        else:
-            self.image_transform = T.Compose ([
-                T.Grayscale (num_output_channels=1),
-                T.Resize ((48, 48)),
-                T.ToTensor (),
-                T.Normalize ([0.5], [0.5])
-            ])
-            self.audio_params = None
-
-    def augment_audio(self, waveform: np.ndarray, sr: int = 16000) -> np.ndarray:
+    def augment_audio (self, waveform: np.ndarray, sr: int = 16000) -> np.ndarray:
         if self.split != 'train' or self.audio_params is None:
             return waveform
         # Pitch shift
-        if random.random() < 0.5:
-            n_steps = random.uniform(*self.audio_params['pitch_shift'])
-            waveform = librosa.effects.pitch_shift(waveform, sr=sr, n_steps=n_steps)
+        if random.random () < 0.5:
+            n_steps = random.uniform (*self.audio_params['pitch_shift'])
+            waveform = librosa.effects.pitch_shift (waveform, sr=sr, n_steps=n_steps)
         # Speed change
-        if random.random() < 0.5:
-            speed_factor = random.uniform(*self.audio_params['speed_change'])
-            waveform = librosa.effects.time_stretch(waveform, rate=speed_factor)
+        if random.random () < 0.5:
+            speed_factor = random.uniform (*self.audio_params['speed_change'])
+            waveform = librosa.effects.time_stretch (waveform, rate=speed_factor)
         # Add noise
-        if random.random() < 0.5:
-            noise = np.random.randn(len(waveform))
+        if random.random () < 0.5:
+            noise = np.random.randn (len (waveform))
             waveform = waveform + self.audio_params['noise_factor'] * noise
         return waveform
 
