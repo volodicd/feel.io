@@ -7,7 +7,69 @@ import librosa
 import torchvision.transforms as T
 import random
 from typing import Dict
+import mediapipe as mp
 
+import mediapipe as mp
+
+
+class EmotionAugmentation:
+    def __init__ (self, split='train'):
+        self.split = split
+        self.face_detector = mp.solutions.face_detection.FaceDetection (
+            model_selection=1, min_detection_confidence=0.5
+        )
+
+        if split == 'train':
+            self.image_transform = T.Compose ([
+                T.Grayscale (num_output_channels=1),
+                T.Resize ((48, 48)),
+                T.RandomHorizontalFlip (p=0.5),
+                T.RandomAffine (degrees=5, translate=(0.05, 0.05)),
+                T.ToTensor (),
+                T.Normalize ([0.5], [0.5])
+            ])
+        else:
+            self.image_transform = T.Compose ([
+                T.Grayscale (num_output_channels=1),
+                T.Resize ((48, 48)),
+                T.ToTensor (),
+                T.Normalize ([0.5], [0.5])
+            ])
+
+    def process_image (self, image_path):
+        # Load image
+        image = Image.open (image_path).convert ('RGB')
+        image_np = np.array (image)
+
+        # Detect face
+        results = self.face_detector.process (image_np)
+
+        if results.detections:
+            detection = results.detections[0]  # Take first face
+            bbox = detection.location_data.relative_bounding_box
+
+            # Convert relative coordinates to absolute
+            h, w = image_np.shape[:2]
+            x = int (bbox.xmin * w)
+            y = int (bbox.ymin * h)
+            width = int (bbox.width * w)
+            height = int (bbox.height * h)
+
+            # Add margin
+            margin = 0.2
+            x = max (0, int (x - width * margin))
+            y = max (0, int (y - height * margin))
+            width = min (w - x, int (width * (1 + 2 * margin)))
+            height = min (h - y, int (height * (1 + 2 * margin)))
+
+            # Crop face
+            face = image.crop ((x, y, x + width, y + height))
+
+            # Apply transformations
+            return self.image_transform (face)
+
+        # If no face detected, process whole image
+        return self.image_transform (image)
 
 class EmotionAugmentation:
     """Data augmentation for emotion recognition"""
@@ -79,6 +141,7 @@ class MultiModalEmotionDataset(Dataset):
 
         # Load image
         image_path = self.image_data.iloc[idx]['path']
+        image = self.augmentation.process_image (image_path)
         image = self.augmentation.image_transform(Image.open (image_path).convert ("RGB"))
 
         # Load audio
