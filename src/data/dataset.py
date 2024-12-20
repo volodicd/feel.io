@@ -39,8 +39,8 @@ class EmotionAugmentation:
             self.audio_params = None
 
     def process_image (self, image_path):
-        # Load image
-        image = Image.open (image_path).convert ('L')  # Convert to grayscale directly
+        # Load image (keep as RGB for face detection)
+        image = Image.open (image_path).convert ('RGB')
         image_np = np.array (image)
 
         # Detect face
@@ -67,11 +67,12 @@ class EmotionAugmentation:
             # Crop face
             face = image.crop ((x, y, x + width, y + height))
 
-            # Apply transformations
+            # Convert to grayscale and transform
+            face = face.convert ('L')
             return self.image_transform (face)
 
         # If no face detected, process whole image
-        return self.image_transform (image)
+        return self.image_transform (image.convert ('L'))
 
     def augment_audio (self, waveform: np.ndarray, sr: int = 16000) -> np.ndarray:
         if self.split != 'train' or self.audio_params is None:
