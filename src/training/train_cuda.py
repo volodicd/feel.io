@@ -313,12 +313,12 @@ class EmotionTrainer:
 def main ():
     # Configuration optimized for CUDA
     config = {
-        'batch_size': 16,  # Larger batch size
+        'batch_size': 64,  # Larger batch size
         'num_workers': 8,  # More workers for data loading
         'learning_rate': 1e-3,  # Higher initial learning rate
         'weight_decay': 1e-4,  # Adjusted weight decay
-        'epochs': 100,  # More epochs
-        'patience': 15,  # Keep current patience
+        'epochs': 500,  # More epochs
+        'patience': 150,  # Keep current patience
         'scheduler_patience': 5,
         'grad_clip': 1.0,
         'pin_memory': True,
