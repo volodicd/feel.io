@@ -314,7 +314,7 @@ def main ():
     # Configuration optimized for CUDA
     config = {
         'batch_size': 32,  # Larger batch size
-        'num_workers': 8,  # More workers for data loading
+        'num_workers': 2,  # More workers for data loading
         'learning_rate': 1e-4,  # Higher initial learning rate
         'weight_decay': 5e-4,  # Adjusted weight decay
         'epochs': 50,  # More epochs
