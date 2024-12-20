@@ -240,20 +240,20 @@ class ImprovedEmotionModel(nn.Module):
 
         # Stack only available features
         if len (features) > 0:
-            fused_features = torch.stack (features, dim=1)  # [B, num_features, 256]
-            fused_features = nn.LayerNorm (256).to (device) (fused_features)
-            # Modified fusion section
-            fused, _ = self.cross_attention (fused_features, fused_features, fused_features)
-            fusion_features = fused.mean (dim=1)
-            feature_weights = torch.softmax (torch.randn (len (features)).to (device), dim=0)
-            weighted_features = torch.stack ([feat * w for feat, w in zip (features, feature_weights)])
-            fusion_features = fusion_features + weighted_features.mean (dim=0)
+            # Stack features: [B, num_modalities, 256]
+            fused_features = torch.stack (features, dim=1)
+            # Apply layer norm before attention
+            fused_features = self.fusion_norm (fused_features)
+            # Self-attention across modalities
+            attended_features, _ = self.cross_attention (fused_features, fused_features, fused_features)
+            # Weighted sum using attention scores
+            fusion_features = attended_features.mean (dim=1)
 
         else:
             fusion_features = zero_features
 
         # Final fusion prediction
-        fusion_pred = self.classifiers['fusion'] (fusion_features)
+        fusion_pred = self.classifiers['fusion'](fusion_features)
         predictions['fusion_pred'] = fusion_pred
 
         return predictions

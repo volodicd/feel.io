@@ -317,8 +317,8 @@ def main ():
         'num_workers': 8,  # More workers for data loading
         'learning_rate': 1e-3,  # Higher initial learning rate
         'weight_decay': 1e-4,  # Adjusted weight decay
-        'epochs': 500,  # More epochs
-        'patience': 150,  # Keep current patience
+        'epochs': 20,  # More epochs
+        'patience': 7,  # Keep current patience
         'scheduler_patience': 5,
         'grad_clip': 1.0,
         'pin_memory': True,
