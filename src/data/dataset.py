@@ -39,40 +39,44 @@ class EmotionAugmentation:
             self.audio_params = None
 
     def process_image (self, image_path):
-        # Load image (keep as RGB for face detection)
-        image = Image.open (image_path).convert ('RGB')
-        image_np = np.array (image)
+        try:
+            # Load image (keep as RGB for face detection)
+            image = Image.open (image_path).convert ('RGB')
+            image_np = np.array (image)
 
-        # Detect face
-        results = self.face_detector.process (image_np)
+            # Detect face
+            with self.face_detector as detector:  # Use context manager
+                results = detector.process (image_np)
 
-        if results.detections:
-            detection = results.detections[0]  # Take first face
-            bbox = detection.location_data.relative_bounding_box
+            if results and results.detections:
+                detection = results.detections[0]  # Take first face
+                bbox = detection.location_data.relative_bounding_box
 
-            # Convert relative coordinates to absolute
-            h, w = image_np.shape[:2]
-            x = int (bbox.xmin * w)
-            y = int (bbox.ymin * h)
-            width = int (bbox.width * w)
-            height = int (bbox.height * h)
+                # Convert relative coordinates to absolute
+                h, w = image_np.shape[:2]
+                x = int (bbox.xmin * w)
+                y = int (bbox.ymin * h)
+                width = int (bbox.width * w)
+                height = int (bbox.height * h)
 
-            # Add margin
-            margin = 0.2
-            x = max (0, int (x - width * margin))
-            y = max (0, int (y - height * margin))
-            width = min (w - x, int (width * (1 + 2 * margin)))
-            height = min (h - y, int (height * (1 + 2 * margin)))
+                # Add margin
+                margin = 0.2
+                x = max (0, int (x - width * margin))
+                y = max (0, int (y - height * margin))
+                width = min (w - x, int (width * (1 + 2 * margin)))
+                height = min (h - y, int (height * (1 + 2 * margin)))
 
-            # Crop face
-            face = image.crop ((x, y, x + width, y + height))
+                # Crop face
+                face = image.crop ((x, y, x + width, y + height))
+                face = face.convert ('L')  # Convert to grayscale
+                return self.image_transform (face)
 
-            # Convert to grayscale and transform
-            face = face.convert ('L')
-            return self.image_transform (face)
+        except Exception as e:
+            print (f"Error processing image {image_path}: {str (e)}")
 
-        # If no face detected, process whole image
-        return self.image_transform (image.convert ('L'))
+        # If anything fails, just process the whole image
+        image = Image.open (image_path).convert ('L')
+        return self.image_transform (image)
 
     def augment_audio (self, waveform: np.ndarray, sr: int = 16000) -> np.ndarray:
         if self.split != 'train' or self.audio_params is None:
