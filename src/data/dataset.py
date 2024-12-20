@@ -38,7 +38,7 @@ class EmotionAugmentation:
 
     def process_image (self, image_path):
         # Load image
-        image = Image.open (image_path).convert ('RGB')
+        image = Image.open (image_path).convert ('L')  # Convert to grayscale directly
         image_np = np.array (image)
 
         # Detect face
@@ -142,7 +142,7 @@ class MultiModalEmotionDataset(Dataset):
         # Load image
         image_path = self.image_data.iloc[idx]['path']
         image = self.augmentation.process_image (image_path)
-        image = self.augmentation.image_transform(Image.open (image_path).convert ("RGB"))
+        #image = self.augmentation.image_transform(Image.open (image_path).convert ("RGB"))
 
         # Load audio
         audio_path = self.audio_data.iloc[idx]['path']
