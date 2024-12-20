@@ -11,72 +11,36 @@ import mediapipe as mp
 
 
 class EmotionAugmentation:
-    """Data augmentation for emotion recognition"""
-
-    def __init__ (self, split='train'):
+    def __init__(self, split='train'):
         self.split = split
-        self.face_detector = mp.solutions.face_detection.FaceDetection (
-            model_selection=1, min_detection_confidence=0.5
-        )
-
         if split == 'train':
-            self.image_transform = T.Compose ([
-                T.Grayscale (num_output_channels=1),
-                T.Resize ((48, 48)),
-                T.RandomHorizontalFlip (p=0.5),
-                T.RandomAffine (degrees=5, translate=(0.05, 0.05)),
-                T.ToTensor (),
-                T.Normalize ([0.5], [0.5])
+            self.image_transform = T.Compose([
+                T.Grayscale(num_output_channels=1),
+                T.Resize((48, 48)),
+                T.RandomHorizontalFlip(p=0.5),
+                T.RandomAffine(degrees=5, translate=(0.05, 0.05)),
+                T.ToTensor(),
+                T.Normalize([0.5], [0.5])
             ])
             self.audio_params = {'pitch_shift': (-2, 2), 'speed_change': (0.9, 1.1), 'noise_factor': 0.005}
         else:
-            self.image_transform = T.Compose ([
-                T.Grayscale (num_output_channels=1),
-                T.Resize ((48, 48)),
-                T.ToTensor (),
-                T.Normalize ([0.5], [0.5])
+            self.image_transform = T.Compose([
+                T.Grayscale(num_output_channels=1),
+                T.Resize((48, 48)),
+                T.ToTensor(),
+                T.Normalize([0.5], [0.5])
             ])
             self.audio_params = None
 
-    def process_image (self, image_path):
+    def process_image(self, image_path):
         try:
-            # Load image (keep as RGB for face detection)
-            image = Image.open (image_path).convert ('RGB')
-            image_np = np.array (image)
-
-            # Detect face
-            with self.face_detector as detector:  # Use context manager
-                results = detector.process (image_np)
-
-            if results and results.detections:
-                detection = results.detections[0]  # Take first face
-                bbox = detection.location_data.relative_bounding_box
-
-                # Convert relative coordinates to absolute
-                h, w = image_np.shape[:2]
-                x = int (bbox.xmin * w)
-                y = int (bbox.ymin * h)
-                width = int (bbox.width * w)
-                height = int (bbox.height * h)
-
-                # Add margin
-                margin = 0.2
-                x = max (0, int (x - width * margin))
-                y = max (0, int (y - height * margin))
-                width = min (w - x, int (width * (1 + 2 * margin)))
-                height = min (h - y, int (height * (1 + 2 * margin)))
-
-                # Crop face
-                face = image.crop ((x, y, x + width, y + height))
-                face = face.convert ('L')  # Convert to grayscale
-                return self.image_transform (face)
-
+            # Simple image processing without face detection
+            image = Image.open(image_path).convert('L')
+            return self.image_transform(image)
         except Exception as e:
-            print (f"Error processing image {image_path}: {str (e)}")
-
-        # If anything fails, just process the whole image
-        image = Image.open (image_path).convert ('L')
-        return self.image_transform (image)
+            print(f"Error processing image {image_path}: {str(e)}")
+            # Return a zero tensor as fallback
+            return torch.zeros(1, 48, 48)
 
     def augment_audio (self, waveform: np.ndarray, sr: int = 16000) -> np.ndarray:
         if self.split != 'train' or self.audio_params is None:
