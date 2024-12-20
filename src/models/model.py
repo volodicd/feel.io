@@ -113,7 +113,12 @@ class ImprovedEmotionModel(nn.Module):
         self.audio_norm = nn.LayerNorm(256)
         self.text_norm = nn.LayerNorm(256)
         self.fusion_norm = nn.LayerNorm(256)
-
+        self.fusion_mlp = nn.Sequential(
+            nn.Linear(256 * 3, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, 256)
+        )
         # Create a classification head for each modality plus the fusion
         classifier_config = [
             ('image', self.image_norm),
@@ -251,16 +256,15 @@ class ImprovedEmotionModel(nn.Module):
             features.append(text_features)
 
         # Stack only available features
-        if len (features) > 0:
-            # Stack features: [B, num_modalities, 256]
-            fused_features = torch.stack (features, dim=1)
-            # Apply layer norm before attention
-            fused_features = self.fusion_norm (fused_features)
-            # Self-attention across modalities
-            attended_features, _ = self.cross_attention (fused_features, fused_features, fused_features)
-            # Weighted sum using attention scores
-            fusion_features = attended_features.mean (dim=1)
-
+        if len(features) > 0:
+            # Concatenate all available features
+            fused_features = torch.cat(features, dim=1)  # [B, 256 * num_modalities]
+            # Pad with zeros for missing modalities
+            if len(features) < 3:
+                padding = torch.zeros((fused_features.size(0), 256 * (3 - len(features))), device=device)
+                fused_features = torch.cat([fused_features, padding], dim=1)
+            # Process through MLP
+            fusion_features = self.fusion_mlp(fused_features)
         else:
             fusion_features = zero_features
 
