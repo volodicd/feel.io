@@ -126,6 +126,7 @@ class ImprovedEmotionModel(nn.Module):
             name: self._make_classifier(norm_layer, num_emotions, dropout)
             for name, norm_layer in classifier_config
         })
+        self.init_weights()
 
     # -------------------------------------------------------------
     # Utility function for audio blocks
@@ -160,6 +161,17 @@ class ImprovedEmotionModel(nn.Module):
     # -------------------------------------------------------------
     # Forward pass (audio, image, text)
     # -------------------------------------------------------------
+
+    def init_weights (self):
+        for m in self.modules ():
+            if isinstance (m, (nn.Conv2d, nn.Conv1d, nn.Linear)):
+                nn.init.kaiming_normal_ (m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_ (m.bias, 0)
+            elif isinstance (m, (nn.BatchNorm2d, nn.BatchNorm1d)):
+                nn.init.constant_ (m.weight, 1)
+                nn.init.constant_ (m.bias, 0)
+
     def forward (self,
                  image: Optional[torch.Tensor] = None,  # shape: [B, 3, H, W]
                  audio: Optional[torch.Tensor] = None,  # shape: [B, 1, T_audio]
