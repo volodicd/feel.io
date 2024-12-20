@@ -34,7 +34,7 @@ class ImprovedEmotionModel(nn.Module):
         # -------------------------------------------------------------
         self.image_encoder = nn.Sequential (
             # First block
-            nn.Conv2d (3, 64, kernel_size=3, padding=1),
+            nn.Conv2d (1, 64, kernel_size=3, padding=1),  # Changed input channels to 1
             nn.BatchNorm2d (64),
             nn.ReLU (),
             nn.MaxPool2d (2),
