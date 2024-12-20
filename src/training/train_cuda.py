@@ -313,16 +313,17 @@ class EmotionTrainer:
 def main ():
     # Configuration optimized for CUDA
     config = {
-        'batch_size': 32,  # Larger batch size
-        'num_workers':1,  # More workers for data loading
-        'learning_rate': 1e-4,  # Higher initial learning rate
-        'weight_decay': 5e-4,  # Adjusted weight decay
-        'epochs': 50,  # More epochs
-        'patience': 10,  # Keep current patience
+        'batch_size': 256,  # RTX 4090 has 24GB VRAM, can handle larger batches
+        'num_workers': 12,  # RTX 4090 is powerful enough to handle more workers
+        'learning_rate': 3e-4,  # Slightly higher for larger batch size
+        'weight_decay': 1e-3,  # Increased for better regularization with larger batches
+        'epochs': 50,
+        'patience': 10,
         'scheduler_patience': 5,
-        'grad_clip': 0.1,
+        'grad_clip': 0.5,  # Increased for larger batches
         'pin_memory': True,
-        'cuda_non_blocking': True
+        'cuda_non_blocking': True,
+        'amp': True,  # Enable automatic mixed precision
     }
 
     try:
