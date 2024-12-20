@@ -33,34 +33,32 @@ class ImprovedEmotionModel(nn.Module):
         # 1. Image Encoder
         # -------------------------------------------------------------
         self.image_encoder = nn.Sequential (
-            # First block
-            nn.Conv2d (1, 64, kernel_size=5, padding=2),  # Larger kernel size for broader features
+            # Block 1
+            nn.Conv2d (1, 64, 3, padding=1),
             nn.BatchNorm2d (64),
-            nn.LeakyReLU (),
-            nn.MaxPool2d (2),
-            nn.Dropout (0.2),
-
-            # Second block
-            nn.Conv2d (64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d (128),
-            nn.LeakyReLU (),
+            nn.ReLU (inplace=True),
+            nn.Conv2d (64, 64, 3, padding=1),
+            nn.BatchNorm2d (64),
+            nn.ReLU (inplace=True),
             nn.MaxPool2d (2),
             nn.Dropout (0.3),
 
-            # Third block
-            nn.Conv2d (128, 256, kernel_size=3, padding=1),
-            nn.BatchNorm2d (256),
-            nn.LeakyReLU (),
+            # Block 2
+            nn.Conv2d (64, 128, 3, padding=1),
+            nn.BatchNorm2d (128),
+            nn.ReLU (inplace=True),
+            nn.Conv2d (128, 128, 3, padding=1),
+            nn.BatchNorm2d (128),
+            nn.ReLU (inplace=True),
             nn.MaxPool2d (2),
             nn.Dropout (0.4),
 
-            # Projection and flatten
-            nn.AdaptiveAvgPool2d ((1, 1)),
-            nn.Conv2d (256, 256, kernel_size=1),  # Projection
+            # Dense layers
             nn.Flatten (),
-            nn.BatchNorm1d (256),
-            nn.ReLU (),
-            nn.Dropout (0.5)
+            nn.Linear (128 * 12 * 12, 512),
+            nn.ReLU (inplace=True),
+            nn.Dropout (0.5),
+            nn.Linear (512, 256)
         )
 
         # -------------------------------------------------------------
