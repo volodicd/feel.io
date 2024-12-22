@@ -8,6 +8,8 @@ from datetime import datetime
 from tqdm import tqdm
 import numpy as np
 from typing import Dict, Tuple
+from sklearn.metrics import confusion_matrix
+
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, RandomSampler
 # Import from your project structure
@@ -126,6 +128,7 @@ class EmotionTrainer:
             logging.info (f"  Loss: {train_loss:.4f}")
             logging.info (f"  Image Accuracy: {train_metrics['image_accuracy']:.4f}")
             logging.info (f"  Audio Accuracy: {train_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Text Accuracy: {train_metrics['text_accuracy']:.4f}")
             logging.info (f"  Fusion Accuracy: {train_metrics['fusion_accuracy']:.4f}")
 
             # Validation phase
@@ -134,6 +137,7 @@ class EmotionTrainer:
             logging.info (f"  Loss: {val_loss:.4f}")
             logging.info (f"  Image Accuracy: {val_metrics['image_accuracy']:.4f}")
             logging.info (f"  Audio Accuracy: {val_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Text Accuracy: {train_metrics['text_accuracy']:.4f}")
             logging.info (f"  Fusion Accuracy: {val_metrics['fusion_accuracy']:.4f}")
 
             # Update learning rate scheduler
@@ -151,8 +155,14 @@ class EmotionTrainer:
             logging.info (f"  GPU Memory Cached: {memory_cached / 1e9:.2f}GB")
 
             # Check for improvement
-            if val_metrics['fusion_accuracy'] > best_acc:
-                best_acc = val_metrics['fusion_accuracy']
+            average_val_accuracy = (
+                                           val_metrics['image_accuracy'] +
+                                           val_metrics['audio_accuracy'] +
+                                           val_metrics['text_accuracy'] +
+                                           val_metrics['fusion_accuracy']
+                                   ) / 4
+            if average_val_accuracy > best_acc:
+                best_acc = average_val_accuracy
                 self.save_checkpoint (epoch, val_metrics)
                 early_stop_counter = 0
                 logging.info (f"New best accuracy: {best_acc:.4f}")
@@ -181,15 +191,16 @@ class EmotionTrainer:
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
         for batch in progress_bar:
             # Move data to GPU
-            audio = batch['audio'].cuda (non_blocking=True)
-            image = batch['image'].cuda (non_blocking=True)
-            targets = batch['emotion'].cuda (non_blocking=True)
+            audio = batch['audio'].cuda(non_blocking=True)
+            image = batch['image'].cuda(non_blocking=True)
+            text_input = batch['text'].cuda(non_blocking=True)
+            targets = batch['emotion'].cuda(non_blocking=True)
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
             # Mixed precision forward pass
             with torch.cuda.amp.autocast ():
-                outputs = self.model(image=image, audio=audio)
+                outputs = self.model (image=image, audio=audio, text_input=text_input)
                 loss = self.criterion (outputs, targets)
 
             # Scaled backpropagation
@@ -229,6 +240,9 @@ class EmotionTrainer:
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
             )
+            metrics['text_accuracy'] = np.mean (
+                np.array (predictions['text']) == metrics['true_labels']
+            )
 
         return metrics['loss'], metrics
 
@@ -245,10 +259,11 @@ class EmotionTrainer:
             for batch in tqdm (val_loader, desc='Validation'):
                 audio = batch['audio'].cuda (non_blocking=True)
                 image = batch['image'].cuda (non_blocking=True)
+                text_input = batch['text'].cuda (non_blocking=True)
                 targets = batch['emotion'].cuda (non_blocking=True)
 
                 with torch.amp.autocast(device_type='cuda'):
-                    outputs = self.model(image=image, audio=audio)
+                    outputs = self.model (image=image, audio=audio, text_input=text_input)  # Include text input
                     loss = self.criterion (outputs, targets)
 
                 total_loss += loss.item ()
@@ -276,6 +291,13 @@ class EmotionTrainer:
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
             )
+            metrics[f'text_accuracy'] = np.mean (
+                np.array (predictions['text']) == metrics['true_labels']
+            )
+        all_preds_fusion = np.array (predictions['fusion'])
+        fusion_conf_matrix = confusion_matrix (all_targets, all_preds_fusion)
+        logging.info (f"Confusion Matrix for Fusion:\n{fusion_conf_matrix}")
+
         return metrics['loss'], metrics, predictions
 
     def save_checkpoint (self, epoch: int, metrics: Dict):
