@@ -68,7 +68,7 @@ class ImprovedEmotionModel(nn.Module):
             self._make_audio_block(1, 64),
             self._make_audio_block(64, 128),
             self._make_audio_block(128, 256),
-            nn.AdaptiveAvgPool1d(1)
+            nn.AdaptiveAvgPool1d(1)  # Global average pooling
         )
 
         # -------------------------------------------------------------

@@ -331,7 +331,7 @@ def main ():
         logging.info ("Loading datasets...")
         image_data = pd.concat ([
             pd.read_csv ('data/processed/fer2013.csv'),
-            pd.read_csv ('data/processed/expw.csv')
+        #    pd.read_csv ('data/processed/expw.csv')
         ])
         audio_data = pd.read_csv ('data/processed/ravdess.csv')
         text_data = pd.read_csv ('data/processed/goemotions.csv')
