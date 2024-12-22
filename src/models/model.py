@@ -18,7 +18,7 @@ class ImprovedEmotionModel(nn.Module):
     """
 
     def __init__(self, num_emotions: int = 7, dropout: float = 0.5,
-                 vocab_size: int = 20000, embed_dim: int = 128, rnn_hidden: int = 256):
+                 vocab_size: int = 30522, embed_dim: int = 128, rnn_hidden: int = 256):
         """
         Args:
             num_emotions: Number of emotion classes

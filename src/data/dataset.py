@@ -7,6 +7,7 @@ import librosa
 import torchvision.transforms as T
 import random
 from typing import Dict
+from transformers import BertTokenizer
 import mediapipe as mp
 
 
@@ -74,8 +75,8 @@ class MultiModalEmotionDataset(Dataset):
 
         # Initialize augmentation
         self.augmentation = EmotionAugmentation(split)
-        self.tokenizer = lambda text: [ord(c) for c in text[:max_text_length]]
 
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     def __len__(self):
         return min(len(self.image_data), len(self.audio_data), len(self.text_data))
 
@@ -98,7 +99,14 @@ class MultiModalEmotionDataset(Dataset):
 
         # Process text
         text = self.text_data.iloc[idx]['text']
-        text_tensor = self._pad_text(self.tokenizer (text))
+        encoded = self.tokenizer (
+            text,
+            padding='max_length',
+            truncation=True,
+            max_length=self.max_text_length,
+            return_tensors='pt'
+        )
+        text_tensor = encoded['input_ids'].squeeze (0)
 
         # Emotion label
         emotion = self.image_data.iloc[idx]['emotion']
@@ -116,12 +124,6 @@ class MultiModalEmotionDataset(Dataset):
             return waveform[:target_length]
         return np.pad(waveform, (0, target_length - len(waveform)), mode='constant')
 
-    def _pad_text(self, tokens: list) -> torch.Tensor:
-        if len(tokens) < self.max_text_length:
-            tokens.extend([0] * (self.max_text_length - len(tokens)))
-        else:
-            tokens = tokens[:self.max_text_length]
-        return torch.tensor(tokens, dtype=torch.long)
 
 
 
