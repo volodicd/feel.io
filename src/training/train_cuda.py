@@ -179,27 +179,26 @@ class EmotionTrainer:
         logging.info (f"Best validation accuracy: {best_acc:.4f}")
         self.writer.close ()
 
+    # In train.py, update the train_epoch method
     def train_epoch (self, train_loader: DataLoader, epoch: int) -> Tuple[float, Dict]:
-        """Train for one epoch with CUDA and mixed precision optimizations"""
         self.model.train ()
-
         total_loss = 0.0
-        predictions = {'image': [], 'audio': [], 'fusion': []}
+        predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
-
 
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
         for batch in progress_bar:
             # Move data to GPU
-            audio = batch['audio'].cuda(non_blocking=True)
-            image = batch['image'].cuda(non_blocking=True)
-            text_input = batch['text'].cuda(non_blocking=True)
-            targets = batch['emotion'].cuda(non_blocking=True)
+            audio = batch['audio'].cuda (non_blocking=True)
+            image = batch['image'].cuda (non_blocking=True)
+            text_input = batch['text'].cuda (non_blocking=True)
+            targets = batch['emotion'].cuda (non_blocking=True)
+
             # Clear gradients
             self.optimizer.zero_grad (set_to_none=True)
 
             # Mixed precision forward pass
-            with torch.cuda.amp.autocast ():
+            with torch.amp.autocast (device_type='cuda'):
                 outputs = self.model (image=image, audio=audio, text_input=text_input)
                 loss = self.criterion (outputs, targets)
 
@@ -220,9 +219,10 @@ class EmotionTrainer:
             total_loss += loss.item ()
 
             with torch.no_grad ():
-                for key in outputs:
-                    pred = outputs[key].argmax (1).cpu ()
-                    predictions[key.replace ('_pred', '')].extend (pred.numpy ())
+                for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
+                    if key in outputs:
+                        pred = outputs[key].argmax (1).cpu ()
+                        predictions[key.replace ('_pred', '')].extend (pred.numpy ())
                 all_targets.extend (targets.cpu ().numpy ())
 
             # Update progress bar
@@ -236,13 +236,13 @@ class EmotionTrainer:
             'loss': total_loss / len (train_loader),
             'true_labels': np.array (all_targets)
         }
-        for key, preds in predictions.items ():
-            metrics[f'{key}_accuracy'] = np.mean (
-                np.array (preds) == metrics['true_labels']
-            )
-            metrics['text_accuracy'] = np.mean (
-                np.array (predictions['text']) == metrics['true_labels']
-            )
+
+        # Calculate accuracies for all available modalities
+        for key in predictions:
+            if predictions[key]:  # Only calculate if predictions exist
+                metrics[f'{key}_accuracy'] = np.mean (
+                    np.array (predictions[key]) == metrics['true_labels']
+                )
 
         return metrics['loss'], metrics
 
@@ -251,7 +251,7 @@ class EmotionTrainer:
         """Validate the model with CUDA optimizations"""
         self.model.eval ()
         total_loss = 0.0
-        predictions = {'image': [], 'audio': [], 'fusion': []}
+        predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
 
         stream = torch.cuda.Stream ()
