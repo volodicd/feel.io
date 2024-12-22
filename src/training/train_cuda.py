@@ -357,7 +357,8 @@ def main ():
         ])
         audio_data = pd.read_csv ('data/processed/ravdess.csv')
         text_data = pd.read_csv ('data/processed/goemotions.csv')
-
+        max_token = text_data['text'].max()
+        print(f"Max token: {max_token}")
         # Align datasets
         logging.info ("Aligning datasets...")
         aligned_data = align_datasets (image_data, audio_data, text_data)
