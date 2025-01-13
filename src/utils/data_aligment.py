@@ -25,13 +25,9 @@ def align_datasets (image_data: pd.DataFrame, audio_data: pd.DataFrame, text_dat
                 max_len = max (len (img_group), len (aud_group), len (txt_group))
                 min_len = min (len (img_group), len (aud_group), len (txt_group))
                 target_size = (max_len + min_len) // 2  # e.g. midpoint
-                img_sample_size = min(max(len(img_group), target_size), len(img_group))  # or oversample if group < target_size
-                aud_sample_size = min (max (len (aud_group), target_size),
-                                       len (aud_group))
-                txt_sample_size = min (max (len (txt_group), target_size),
-                                       len (txt_group))
-
-                # Sample equal number from each
+                img_sample_size = max(min_len, min(len(img_group), target_size))   # or oversample if group < target_size
+                aud_sample_size = max(min_len, min(len(aud_group), target_size))
+                txt_sample_size = max(min_len, min(len(txt_group), target_size))
                 img_samples = img_group.sample (n=img_sample_size, random_state=42)
                 aud_samples = aud_group.sample (n=aud_sample_size, random_state=42)
                 txt_samples = txt_group.sample (n=txt_sample_size, random_state=42)
