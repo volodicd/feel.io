@@ -137,8 +137,9 @@ class EmotionTrainer:
             logging.info (f"  Loss: {val_loss:.4f}")
             logging.info (f"  Image Accuracy: {val_metrics['image_accuracy']:.4f}")
             logging.info (f"  Audio Accuracy: {val_metrics['audio_accuracy']:.4f}")
-            logging.info (f"  Text Accuracy: {train_metrics['text_accuracy']:.4f}")
+            logging.info (f"  Text Accuracy: {val_metrics['text_accuracy']:.4f}")
             logging.info (f"  Fusion Accuracy: {val_metrics['fusion_accuracy']:.4f}")
+
 
             # Update learning rate scheduler
             self.scheduler.step (val_loss)
@@ -175,6 +176,7 @@ class EmotionTrainer:
 
             # Clear cache periodically
             torch.cuda.empty_cache ()
+
 
         logging.info (f"Best validation accuracy: {best_acc:.4f}")
         self.writer.close ()
@@ -243,6 +245,7 @@ class EmotionTrainer:
                 metrics[f'{key}_accuracy'] = np.mean (
                     np.array (predictions[key]) == metrics['true_labels']
                 )
+
 
         return metrics['loss'], metrics
 
