@@ -418,7 +418,7 @@ def main ():
 
         # Data loaders
         train_loader = DataLoader (
-            train_dataset,label_level_align,
+            train_dataset,
             batch_size = config['batch_size'],
             sampler=RandomSampler (train_dataset),
             num_workers=config['num_workers'],
