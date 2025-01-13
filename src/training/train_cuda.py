@@ -419,7 +419,7 @@ def main ():
         # Data loaders
         train_loader = DataLoader (
             train_dataset,label_level_align,
-            batch_size=config['batch_size'],
+            batch_size = config['batch_size'],
             sampler=RandomSampler (train_dataset),
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
