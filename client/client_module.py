@@ -83,7 +83,7 @@ def main():
     global model
 # Load the trained model
     model = ImprovedEmotionModel(num_emotions=7)  # Adjust num_emotions as needed
-    checkpoint = torch.load('models/checkpoints/checkpoint_epoch_8_acc_0.438.pt', map_location=torch.device('cpu'))
+    checkpoint = torch.load('models/checkpoints/checkpoint_epoch_0_acc_1.000.pt', map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     print("Model successfully loaded.")
