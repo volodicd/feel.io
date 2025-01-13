@@ -275,7 +275,7 @@ class MultiModalLoss(nn.Module):
         super().__init__()
         self.criterion = nn.CrossEntropyLoss()
         # Default if user doesn't provide weights for text
-        self.weights = weights or {'image': 0.35, 'audio': 0.20, 'text': 0.20, 'fusion': 0.25}
+        self.weights = weights or {'image': 0.3, 'audio': 0.3, 'text': 0.3, 'fusion': 0.1}
 
         if not np.isclose(sum(self.weights.values()), 1.0):
             raise ValueError("Loss weights must sum to 1")

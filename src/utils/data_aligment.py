@@ -22,14 +22,19 @@ def align_datasets (image_data: pd.DataFrame, audio_data: pd.DataFrame, text_dat
                 txt_group = text_groups.get_group ((emotion, split))
 
                 # Get minimum size
-                min_size = min (len (img_group), len (aud_group), len (txt_group))
-
-                logging.info (f"Aligning {split} data for emotion {emotion}: {min_size} samples")
+                max_len = max (len (img_group), len (aud_group), len (txt_group))
+                min_len = min (len (img_group), len (aud_group), len (txt_group))
+                target_size = (max_len + min_len) // 2  # e.g. midpoint
+                img_sample_size = min(max(len(img_group), target_size), len(img_group))  # or oversample if group < target_size
+                aud_sample_size = min (max (len (aud_group), target_size),
+                                       len (aud_group))
+                txt_sample_size = min (max (len (txt_group), target_size),
+                                       len (txt_group))
 
                 # Sample equal number from each
-                img_samples = img_group.sample (n=min_size, random_state=42)
-                aud_samples = aud_group.sample (n=min_size, random_state=42)
-                txt_samples = txt_group.sample (n=min_size, random_state=42)
+                img_samples = img_group.sample (n=img_sample_size, random_state=42)
+                aud_samples = aud_group.sample (n=aud_sample_size, random_state=42)
+                txt_samples = txt_group.sample (n=txt_sample_size, random_state=42)
 
                 # Combine
                 aligned_data.append ({
