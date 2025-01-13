@@ -378,12 +378,24 @@ def main ():
             print ("aligned_data returned None—no overlap found!")
         else:
             print ("\n=== Checking distribution AFTER alignment ===")
-            print ("Final Aligned Train data distribution (images):")
-            print (aligned_data["image"][aligned_data["image"]["split"] == "train"]["emotion"].value_counts ())
-            print ("Final Aligned Test data distribution (images):")
-            print (aligned_data["image"][aligned_data["image"]["split"] == "test"]["emotion"].value_counts ())
+            for dom in ["image", "audio", "text"]:
+                df_dom = aligned_data[dom]
+                print (f"---- {dom.upper ()} TRAIN ----")
+                print (df_dom[df_dom["split"] == "train"]["emotion"].value_counts ())
+                print (f"---- {dom.upper ()} TEST ----")
+                print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
+        print ("Image domain total:", len (aligned_data["image"]))
+        print ("Audio domain total:", len (aligned_data["audio"]))
+        print ("Text domain total:", len (aligned_data["text"]))
+
+        print ("Train images:", len (aligned_data["image"][aligned_data["image"]["split"] == "train"]))
+        print ("Test images:", len (aligned_data["image"][aligned_data["image"]["split"] == "test"]))
+        print ("Train audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "train"]))
+        print ("Test audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "test"]))
+        print ("Train Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "train"]))
+        print ("Test Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "test"]))
 
         logging.info (
             f"Aligned dataset sizes - Train: {len (aligned_data['image'][aligned_data['image']['split'] == 'train'])}, "
@@ -406,7 +418,7 @@ def main ():
 
         # Data loaders
         train_loader = DataLoader (
-            train_dataset,
+            train_dataset,label_level_align,
             batch_size=config['batch_size'],
             sampler=RandomSampler (train_dataset),
             num_workers=config['num_workers'],

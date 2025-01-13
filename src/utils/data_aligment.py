@@ -90,6 +90,10 @@ def label_level_align(
                 continue
 
             target_size = (max_len + min_len) // 2  # or use max_len, or something else
+            print (f"Emotion={emotion}, split={split},  ",
+                   f"img_group={len (img_group)}, aud_group={len (aud_group)}, txt_group={len (txt_group)}, ",
+                   f"target_size={target_size}, ",
+                   f"img_resampled={len (img_resampled)}, aud_resampled={len (aud_resampled)}, txt_resampled={len (txt_resampled)}")
 
             # Oversample/undersample each domain to target_size
             # We'll define a quick helper:
