@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, RandomSampler
 from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
 from src.utils.visualization import ModelVisualizer, LRFinder
-from src.utils.data_aligment import align_datasets
+from src.utils.data_aligment import align_datasets, label_level_align
 
 
 class EmotionTrainer:
@@ -373,7 +373,7 @@ def main ():
                        f"count_img={count_img}, count_aud={count_aud}, count_txt={count_txt}")
 
         logging.info ("Aligning datasets...")
-        aligned_data = align_datasets (image_data, audio_data, text_data)
+        aligned_data = label_level_align(image_data, audio_data, text_data)
         if aligned_data is None:
             print ("aligned_data returned None—no overlap found!")
         else:
