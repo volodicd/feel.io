@@ -363,9 +363,25 @@ def main ():
         max_token = text_data['text'].max()
         print(f"Max token: {max_token}")
         # Align datasets
+        print ("=== Checking distribution BEFORE alignment ===")
+        for emotion in range (7):
+            for split in ["train", "test"]:
+                count_img = len (image_data[(image_data["emotion"] == emotion) & (image_data["split"] == split)])
+                count_aud = len (audio_data[(audio_data["emotion"] == emotion) & (audio_data["split"] == split)])
+                count_txt = len (text_data[(text_data["emotion"] == emotion) & (text_data["split"] == split)])
+                print (f"emotion={emotion}, split={split}, "
+                       f"count_img={count_img}, count_aud={count_aud}, count_txt={count_txt}")
+
         logging.info ("Aligning datasets...")
         aligned_data = align_datasets (image_data, audio_data, text_data)
-
+        if aligned_data is None:
+            print ("aligned_data returned None—no overlap found!")
+        else:
+            print ("\n=== Checking distribution AFTER alignment ===")
+            print ("Final Aligned Train data distribution (images):")
+            print (aligned_data["image"][aligned_data["image"]["split"] == "train"]["emotion"].value_counts ())
+            print ("Final Aligned Test data distribution (images):")
+            print (aligned_data["image"][aligned_data["image"]["split"] == "test"]["emotion"].value_counts ())
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
 
