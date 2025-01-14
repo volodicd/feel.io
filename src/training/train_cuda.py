@@ -300,6 +300,22 @@ class EmotionTrainer:
         all_preds_fusion = np.array (predictions['fusion'])
         fusion_conf_matrix = confusion_matrix (all_targets, all_preds_fusion)
         logging.info (f"Confusion Matrix for Fusion:\n{fusion_conf_matrix}")
+        if len (predictions['image']) > 0:
+            all_preds_image = np.array (predictions['image'])
+            image_conf_matrix = confusion_matrix (all_targets, all_preds_image)
+            logging.info (f"Confusion Matrix for Image:\n{image_conf_matrix}")
+
+            # 2) Audio
+        if len (predictions['audio']) > 0:
+            all_preds_audio = np.array (predictions['audio'])
+            audio_conf_matrix = confusion_matrix (all_targets, all_preds_audio)
+            logging.info (f"Confusion Matrix for Audio:\n{audio_conf_matrix}")
+
+            # 3) Text
+        if len (predictions['text']) > 0:
+            all_preds_text = np.array (predictions['text'])
+            text_conf_matrix = confusion_matrix (all_targets, all_preds_text)
+            logging.info (f"Confusion Matrix for Text:\n{text_conf_matrix}")
 
         return metrics['loss'], metrics, predictions
 
