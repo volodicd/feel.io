@@ -196,56 +196,6 @@ class DatasetProcessor:
             return pd.DataFrame()
 
 
-# Unused func (dataset was delete due to the lack of time)
-    def process_celeba(self) -> pd.DataFrame:
-        """Process CelebA dataset with improved emotion mapping."""
-        celeba_path = self.base_path / 'CelebA'
-        data = []
-
-        try:
-            partition_file = celeba_path / 'annotations' / 'list_eval_partition.csv'
-            attr_file = celeba_path / 'annotations' / 'list_attr_celeba.csv'
-
-            if not partition_file.exists() or not attr_file.exists():
-                logging.error("CelebA: Missing annotation files.")
-                return pd.DataFrame()
-
-            partition_df = pd.read_csv(partition_file)
-            attr_df = pd.read_csv(attr_file)
-
-            # Convert -1/1 to 0/1 for easier processing
-            attr_df[attr_df.columns[1:]] = (attr_df[attr_df.columns[1:]] + 1) // 2
-
-            for idx, row in tqdm(attr_df.iterrows(), total=len(attr_df), desc="Processing CelebA"):
-                try:
-                    image_path = celeba_path / 'images' / row['image_id']
-                    if not image_path.exists():
-                        continue
-
-                    # Determine emotion using complex rules
-                    # emotion = self.determine_celeba_emotion(row) deleted dataset
-                    split = 'train' if partition_df.iloc[idx]['partition'] == 0 else 'test'
-
-                    data.append({
-                        'path':    str(image_path),
-                        # 'emotion': self.emotion_mapping[emotion],
-                        'split':   split
-                    })
-                except Exception as e:
-                    logging.warning(f"CelebA: Error processing row {idx}: {str(e)}")
-
-            df = pd.DataFrame(data)
-            if self.validate_dataset(df, "CelebA"):
-                out_csv = self.processed_path / 'celeba.csv'
-                df.to_csv(out_csv, index=False)
-                logging.info(f"Saved CelebA CSV to {out_csv}")
-                return df
-            return pd.DataFrame()
-
-        except Exception as e:
-            logging.error(f"CelebA processing error: {str(e)}")
-            return pd.DataFrame()
-
     def process_ravdess(self) -> pd.DataFrame:
         """Process RAVDESS dataset with audio validation."""
         ravdess_path = self.base_path / 'RAVDESS' / 'audio_speech_actors_01-24'
@@ -332,7 +282,6 @@ class DatasetProcessor:
                 emotions_list = [line.strip() for line in f.readlines()]
 
             idx_to_emotion = {i: emotion for i, emotion in enumerate(emotions_list)}
-            idx_to_emotion = {i: emotion for i, emotion in enumerate (emotions_list)}
 
             for split in ['train', 'dev', 'test']:
                 tsv_path = base_goemotions_path / f'{split}.tsv'

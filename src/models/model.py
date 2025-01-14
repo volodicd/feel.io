@@ -164,33 +164,6 @@ class ImprovedEmotionModel(nn.Module):
                 nn.init.constant_ (m.weight, 1)
                 nn.init.constant_ (m.bias, 0)
 
-    # # simplified forward pass
-    # def forward(self,
-    #             image: Optional[torch.Tensor] = None,
-    #             audio: Optional[torch.Tensor] = None,
-    #             text_input: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
-    #
-    #     if image is not None:
-    #         batch_size = image.size (0)
-    #         device = image.device
-    #     elif audio is not None:
-    #         batch_size = audio.size (0)
-    #         device = audio.device
-    #     elif text_input is not None:
-    #         batch_size = text_input.size (0)
-    #         device = text_input.device
-    #     # Concatenate available features
-    #     fused_features = torch.cat ([image_features, audio_features, text_features], dim=1)
-    #     fusion_features = self.fusion_mlp (fused_features)
-    #     fusion_pred = self.classifiers['fusion'] (fusion_features)
-    #
-    #     predictions = {
-    #         'image_pred': self.classifiers['image'] (image_features),
-    #         'audio_pred': self.classifiers['audio'] (audio_features),
-    #         'fusion_pred': fusion_pred
-    #     }
-    #     return predictions
-
     # In model.py, update the forward method in ImprovedEmotionModel
     def forward (self,
                  image: Optional[torch.Tensor] = None,
@@ -275,7 +248,7 @@ class MultiModalLoss(nn.Module):
         super().__init__()
         self.criterion = nn.CrossEntropyLoss()
         # Default if user doesn't provide weights for text
-        self.weights = weights or {'image': 0.0, 'audio': 0.0, 'text': 0.5, 'fusion': 0.5}
+        self.weights = weights or {'image': 0.3, 'audio': 0.3, 'text': 0.3, 'fusion': 0.1}
 
         if not np.isclose(sum(self.weights.values()), 1.0):
             raise ValueError("Loss weights must sum to 1")

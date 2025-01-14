@@ -270,15 +270,6 @@ class EmotionTrainer:
                     loss = self.criterion (outputs, targets)
 
                 total_loss += loss.item ()
-                # print ("### Debugging Image Predictions ###")
-                # for i in range (len (targets)):
-                #     print (f"Index {i}:")
-                #     print (f"  True Label: {targets[i].item ()}")
-                #     image_input = image[i].unsqueeze (0).cuda ()  # Single image input
-                #     output = self.model (image=image_input, audio=None)  # Pass only the image
-                #     predicted_label = output['image_pred'].argmax (1).item ()
-                #     print (f"  Predicted Label: {predicted_label}")
-
                 for key in outputs:
                     pred = outputs[key].argmax (1).cpu ()
                     predictions[key.replace ('_pred', '')].extend (pred.numpy ())
@@ -293,9 +284,6 @@ class EmotionTrainer:
         for key, preds in predictions.items ():
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
-            )
-            metrics[f'text_accuracy'] = np.mean (
-                np.array (predictions['text']) == metrics['true_labels']
             )
         all_preds_fusion = np.array (predictions['fusion'])
         fusion_conf_matrix = confusion_matrix (all_targets, all_preds_fusion)

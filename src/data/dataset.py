@@ -8,7 +8,6 @@ import torchvision.transforms as T
 import random
 from typing import Dict
 from transformers import BertTokenizer
-import mediapipe as mp
 
 
 class EmotionAugmentation:
@@ -81,16 +80,9 @@ class MultiModalEmotionDataset(Dataset):
         return min(len(self.image_data), len(self.audio_data), len(self.text_data))
 
     def __getitem__ (self, idx: int) -> Dict[str, torch.Tensor]:
-        # Print debugging information for alignment check
-        # print (f"Index {idx}")
-        # print (f"Image Label: {self.image_data.iloc[idx]['emotion']}")
-        # print (f"Audio Label: {self.audio_data.iloc[idx]['emotion']}")
-        # print (f"Text Label: {self.text_data.iloc[idx]['emotion']}")
-
         # Load image
         image_path = self.image_data.iloc[idx]['path']
         image = self.augmentation.process_image (image_path)
-        #image = self.augmentation.image_transform(Image.open (image_path).convert ("RGB"))
 
         # Load audio
         audio_path = self.audio_data.iloc[idx]['path']
