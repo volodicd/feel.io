@@ -201,10 +201,16 @@ class ImprovedEmotionModel (nn.Module):
                 absent_emb = self.presence_embedding[1:2].expand (batch_size, 1, -1)
                 features.append (mod_token + absent_emb)
 
-        # Combine features and apply attention
-        combined_features = torch.cat (features, dim=1)
-        attention_mask = presence_mask.unsqueeze (1).expand (-1, 3, -1)
+        # Combine features
+        combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
 
+        # Create proper attention mask
+        # First expand for number of attention heads
+        presence_mask = presence_mask.unsqueeze (1)  # [batch_size, 1, 3]
+        # Then expand to proper shape [batch_size, num_heads, seq_len_q, seq_len_k]
+        attention_mask = presence_mask.unsqueeze (2).expand (batch_size, self.fusion_attention.num_heads, 3, 3)
+
+        # Apply attention
         attended_features, _ = self.fusion_attention (
             combined_features, combined_features, combined_features,
             mask=attention_mask
