@@ -48,16 +48,16 @@ class ModelVisualizer:
                          Example: ((1, 16000), (3, 224, 224), 50)
         """
         try:
-            # Create dummy inputs
-            dummy_audio = torch.randn (1, *input_shape[0])  # Audio input
-            dummy_image = torch.randn (1, *input_shape[1])  # Image input
-            dummy_text = torch.randint (0, 1000, (1, input_shape[2]))  # Text input (vocab indices)
+            device = next(model.parameters ()).device  # Get the model's device
+            # Create dummy inputs and move them to the same device
+            dummy_audio = torch.randn (1, *input_shape[0]).to (device)
+            dummy_image = torch.randn (1, *input_shape[1]).to (device)
+            dummy_text = torch.randint (0, 1000, (1, input_shape[2])).to (device)
 
             # Generate computational graph
             with torch.no_grad ():
                 outputs = model (dummy_audio, dummy_image, dummy_text)
-                dot = make_dot (outputs['fusion_pred'],
-                                params=dict (model.named_parameters ()))
+                dot = make_dot (outputs['fusion_pred'], params=dict (model.named_parameters ()))
 
             # Save visualization
             output_path = self.viz_dir / "model_architecture"
