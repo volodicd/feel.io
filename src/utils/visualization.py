@@ -50,9 +50,9 @@ class ModelVisualizer:
         try:
             device = next(model.parameters ()).device  # Get the model's device
             # Create dummy inputs and move them to the same device
-            dummy_audio = torch.randn (1, *input_shape[0]).to (device)
-            dummy_image = torch.randn (1, *input_shape[1]).to (device)
-            dummy_text = torch.randint (0, 1000, (1, input_shape[2])).to (device)
+            dummy_audio = torch.randn(1, *input_shape[0]).to (device)
+            dummy_image = torch.randn(1, *input_shape[1]).unsqueeze(0).to(device)
+            dummy_text = torch.randint(0, 1000, (1, input_shape[2])).to (device)
 
             # Generate computational graph
             with torch.no_grad ():
