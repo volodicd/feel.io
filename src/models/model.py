@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import Dict, Optional
+import math
 
 from src.models.components.blocks import ResidualBlock, ResidualBlock1D
 from src.models.components.attention import MultiHeadAttention
