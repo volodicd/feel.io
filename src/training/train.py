@@ -446,7 +446,7 @@ def main ():
             image_data=aligned_data['image'],
             audio_data=aligned_data['audio'],
             text_data=aligned_data['text'],
-            config=config,  # Pass the config here
+            #config=config,  # Pass the config here
             split='train'
         )
 
@@ -454,7 +454,7 @@ def main ():
             image_data=aligned_data['image'],
             audio_data=aligned_data['audio'],
             text_data=aligned_data['text'],
-            config=config,  # Pass the config here
+            #config=config,  # Pass the config here
             split='test'
         )
 
