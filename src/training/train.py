@@ -39,7 +39,6 @@ class EmotionTrainer:
         self.setup_tensorboard()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
         self.scaler = torch.amp.GradScaler()  if self.config['mixed_precision'] else None
-        self.vizualizer = ModelVisualizer(self.plot_dir)
 
     def setup_device (self):
         """Setup CUDA device for training with proper initialization"""
