@@ -68,7 +68,7 @@ class ImprovedEmotionModel (nn.Module):
 
             ResidualBlock1D (128, 128),
 
-            # Prepare for LSTM: [batch_size, sequence_length, channels]
+            # Inline lambda function for permutation
             nn.Lambda (lambda x: x.permute (0, 2, 1)),
 
             nn.LSTM (
@@ -79,7 +79,6 @@ class ImprovedEmotionModel (nn.Module):
                 bidirectional=True
             ),
 
-            # Average pooling after LSTM to aggregate temporal features
             nn.AdaptiveAvgPool1d (1),
             nn.Flatten (),
             nn.Dropout (dropout),
