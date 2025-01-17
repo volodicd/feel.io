@@ -1,32 +1,29 @@
+# configs/model_config.yaml
+
 model:
-  name: "ImprovedEmotionModel"
+  num_emotions: 7
+  dropout: 0.5
+  rnn_hidden: 256  # Hidden size for the bidirectional RNN
 
-image_encoder:
-  backbone: "resnet18"
-  pretrained: true
-  output_dim: 256
-
-audio_encoder:
-  rnn_units: 128
-  num_layers: 2
-  bidirectional: true
-  dropout: 0.2
-
-text_encoder:
-  embedding_dim: 300
-  hidden_dim: 128
-  rnn_type: "lstm"
-  bidirectional: true
+attention:
+  num_heads: 8
+  dropout: 0.1
 
 fusion:
-  attention_heads: 4
-  dropout: 0.3
-  fusion_dim: 512
+  modality_dim: 256  # Dimension for modality features
+  mlp_hidden: 512    # Hidden dimension in fusion MLP
 
-output_layer:
-  num_classes: 5
-  activation: "softmax"
+image_encoder:
+  initial_channels: 64
+  channels: [64, 128, 256]  # Channel progression in residual blocks
 
-regularization:
-  dropout_rate: 0.5
-  layer_norm: true
+audio_encoder:
+  initial_channels: 64
+  kernel_size: 7
+  channels: [64, 128, 256]  # Channel progression in 1D residual blocks
+
+text_encoder:
+  vocab_size: 30522         # BERT vocabulary size
+  embedding_dim: 128
+  rnn_layers: 1
+  bidirectional: true
