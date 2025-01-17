@@ -86,8 +86,14 @@ class MultiModalEmotionDataset(Dataset):
 
         # Load audio
         audio_path = self.audio_data.iloc[idx]['path']
-        waveform, sr = librosa.load(audio_path, sr=16000)
-        waveform = self._pad_audio(self.augmentation.augment_audio (waveform))
+        waveform, sr = librosa.load (audio_path, sr=16000, mono=True)  # Ensure mono audio
+        waveform = self._pad_audio (self.augmentation.augment_audio (waveform))
+
+        # Create tensor with correct shape [1, sequence_length]
+        audio = torch.tensor (waveform, dtype=torch.float32).unsqueeze (0)  # Add channel dimension
+
+        # Verify shape
+        print (f"Audio tensor shape: {audio.shape}")  # Should be [1, sequence_length]
 
         # Process text
         text = self.text_data.iloc[idx]['text']
@@ -102,7 +108,6 @@ class MultiModalEmotionDataset(Dataset):
 
         # Emotion label
         emotion = self.image_data.iloc[idx]['emotion']
-        audio = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0)
         return {
             'image': image,
             'audio': audio,
@@ -110,12 +115,16 @@ class MultiModalEmotionDataset(Dataset):
             'emotion': torch.tensor (emotion, dtype=torch.long)
         }
 
-    def _pad_audio(self, waveform: np.ndarray) -> np.ndarray:
+    def _pad_audio (self, waveform: np.ndarray) -> np.ndarray:
+        """Ensure consistent audio length"""
         target_length = 16000 * self.max_audio_length
-        if len(waveform) > target_length:
-            return waveform[:target_length]
-        return np.pad(waveform, (0, target_length - len(waveform)), mode='constant')
+        if len (waveform.shape) > 1:  # If not mono
+            waveform = np.mean (waveform, axis=-1)  # Convert to mono
 
+        # Trim or pad
+        if len (waveform) > target_length:
+            return waveform[:target_length]
+        return np.pad (waveform, (0, target_length - len (waveform)), mode='constant')
 
 
 
