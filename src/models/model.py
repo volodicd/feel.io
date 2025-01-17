@@ -50,39 +50,25 @@ class ImprovedEmotionModel (nn.Module):
             nn.Linear (256, 256)
         )
 
-
         # -------------------------------------------------------------
-        # 2. Enhanced Audio Encoder
+        # 2. Audio Encoder (1D conv blocks)
         # -------------------------------------------------------------
         self.audio_encoder = nn.Sequential (
-            # Initial 1D convolution
-            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),
+            # Initial 1D convolution - input: [batch, 1, sequence]
+            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),  # [batch, 64, sequence/2]
             nn.BatchNorm1d (64),
             nn.ReLU (inplace=True),
-            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),
+            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),  # [batch, 64, sequence/4]
 
-            nn.Conv1d (64, 128, kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d (128),
-            nn.ReLU (inplace=True),
-            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),
+            # Audio residual blocks
+            ResidualBlock1D (64, 64),  # [batch, 64, sequence/4]
+            ResidualBlock1D (64, 128, 2),  # [batch, 128, sequence/8]
+            ResidualBlock1D (128, 256, 2),  # [batch, 256, sequence/16]
 
-            ResidualBlock1D (128, 128),
-
-            # Inline lambda function for permutation
-            nn.Lambda (lambda x: x.permute (0, 2, 1)),
-
-            nn.LSTM (
-                input_size=128,  # Match the output channels of Conv1D
-                hidden_size=256,
-                num_layers=2,
-                batch_first=True,
-                bidirectional=True
-            ),
-
-            nn.AdaptiveAvgPool1d (1),
-            nn.Flatten (),
+            nn.AdaptiveAvgPool1d (1),  # [batch, 256, 1]
+            nn.Flatten (),  # [batch, 256]
             nn.Dropout (dropout),
-            nn.Linear (512, 256)
+            nn.Linear (256, 256)  # [batch, 256]
         )
 
         # -------------------------------------------------------------
