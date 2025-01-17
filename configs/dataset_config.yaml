@@ -1,31 +1,45 @@
-dataset:
-  name: "emotion_dataset"
-  data_dir: "/path/to/data"
-  train_csv: "train_data_final.csv"
-  val_csv: "val_data_final.csv"
-  test_csv: "test_data_final.csv"
+# Dataset configurations
+preprocessing:
+  audio:
+    sample_rate: 16000
+    max_length: 10  # seconds
+    normalize: true
+  image:
+    size: [48, 48]
+    channels: 1  # grayscale
+  text:
+    max_length: 50
+    tokenizer: "bert-base-uncased"
 
-image_settings:
-  resize: [224, 224]            # Image resizing dimensions
-  normalize_mean: [0.5, 0.5, 0.5]
-  normalize_std: [0.5, 0.5, 0.5]
-  augmentations:
-    random_crop: true
-    random_flip: true
-    rotation_degree: 10
+augmentation:
+  train:
+    image:
+      horizontal_flip_prob: 0.5
+      rotation_degrees: 5
+      translate: [0.05, 0.05]
+      normalize_mean: [0.5]
+      normalize_std: [0.5]
+    audio:
+      pitch_shift_range: [-2, 2]
+      speed_change_range: [0.9, 1.1]
+      noise_factor: 0.005
+  test:
+    image:
+      normalize_mean: [0.5]
+      normalize_std: [0.5]
 
-audio_settings:
-  sample_rate: 16000
-  duration: 4                   # In seconds
-  n_mfcc: 40                    # Number of MFCC features
-  augmentations:
-    noise_injection: true
-    time_stretch: 1.2
+data_loading:
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  batch_size:
+    train: 32
+    test: 64
 
-text_settings:
-  tokenizer: "bert-base-uncased"
-  max_length: 50                # Maximum sequence length
-
-batch_size: 32
-num_workers: 4                  # For DataLoader parallelism
-shuffle: true
+paths:
+  processed_data: "data/processed"
+  raw_data: "data/raw"
+  fer2013: "data/processed/fer2013.csv"
+  expw: "data/processed/expw.csv"
+  ravdess: "data/processed/ravdess.csv"
+  goemotions: "data/processed/goemotions.csv"
