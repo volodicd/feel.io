@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, Optional
 
-from src.models.components.blocks import ResidualBlock
+from src.models.components.blocks import ResidualBlock, ResidualBlock1D
 from src.models.components.attention import MultiHeadAttention
 
 
@@ -62,9 +62,9 @@ class ImprovedEmotionModel (nn.Module):
             nn.MaxPool1d (kernel_size=3, stride=2, padding=1),  # [batch, 64, sequence/4]
 
             # Audio residual blocks
-            self._make_audio_residual_block (64, 64),  # [batch, 64, sequence/4]
-            self._make_audio_residual_block (64, 128, 2),  # [batch, 128, sequence/8]
-            self._make_audio_residual_block (128, 256, 2),  # [batch, 256, sequence/16]
+            ResidualBlock1D (64, 64),  # [batch, 64, sequence/4]
+            ResidualBlock1D (64, 128, 2),  # [batch, 128, sequence/8]
+            ResidualBlock1D (128, 256, 2),  # [batch, 256, sequence/16]
 
             nn.AdaptiveAvgPool1d (1),  # [batch, 256, 1]
             nn.Flatten (),  # [batch, 256]
@@ -146,34 +146,6 @@ class ImprovedEmotionModel (nn.Module):
 
         self.init_weights ()
 
-    def _make_audio_residual_block (self, in_channels: int, out_channels: int, stride: int = 1):
-        """Create a ResidualBlock variant for 1D audio data"""
-        layers = []
-
-        # First convolution
-        layers.append (nn.Conv1d (in_channels, out_channels, 3,
-                                  stride=stride, padding=1, bias=False))
-        layers.append (nn.BatchNorm1d (out_channels))
-        layers.append (nn.ReLU (inplace=True))
-
-        # Second convolution
-        layers.append (nn.Conv1d (out_channels, out_channels, 3,
-                                  padding=1, bias=False))
-        layers.append (nn.BatchNorm1d (out_channels))
-
-        # Skip connection
-        if stride != 1 or in_channels != out_channels:
-            layers.append (
-                nn.Sequential (
-                    nn.Conv1d (in_channels, out_channels, 1,
-                               stride=stride, bias=False),
-                    nn.BatchNorm1d (out_channels)
-                )
-            )
-
-        layers.append (nn.ReLU (inplace=True))
-
-        return nn.Sequential (*layers)
 
     def _make_classifier (self, norm_layer: nn.Module, num_emotions: int, dropout: float) -> nn.Sequential:
         """Create a classification head"""
