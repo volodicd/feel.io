@@ -45,7 +45,7 @@ class ModelVisualizer:
         Args:
             model: PyTorch model to visualize
             input_shape: Tuple of input shapes (audio_shape, image_shape, text_length).
-                         Example: ((1, 16000), (3, 224, 224), 50)
+                         Example: ((1, 16000), (1, 224, 224), 50)
         """
         try:
             device = next (model.parameters ()).device  # Get the model's device
