@@ -148,20 +148,32 @@ class ImprovedEmotionModel (nn.Module):
 
     def _make_audio_residual_block (self, in_channels: int, out_channels: int, stride: int = 1):
         """Create a ResidualBlock variant for 1D audio data"""
-        return nn.Sequential (
-            nn.Conv1d (in_channels, out_channels, kernel_size=3,
-                       stride=stride, padding=1, bias=False),
-            nn.BatchNorm1d (out_channels),
-            nn.ReLU (inplace=True),
-            nn.Conv1d (out_channels, out_channels, kernel_size=3,
-                       padding=1, bias=False),
-            nn.BatchNorm1d (out_channels),
-            nn.Sequential (
-                nn.Conv1d (in_channels, out_channels, 1, stride=stride, bias=False),
-                nn.BatchNorm1d (out_channels)
-            ) if stride != 1 or in_channels != out_channels else nn.Identity (),
-            nn.ReLU (inplace=True)
-        )
+        layers = []
+
+        # First convolution
+        layers.append (nn.Conv1d (in_channels, out_channels, 3,
+                                  stride=stride, padding=1, bias=False))
+        layers.append (nn.BatchNorm1d (out_channels))
+        layers.append (nn.ReLU (inplace=True))
+
+        # Second convolution
+        layers.append (nn.Conv1d (out_channels, out_channels, 3,
+                                  padding=1, bias=False))
+        layers.append (nn.BatchNorm1d (out_channels))
+
+        # Skip connection
+        if stride != 1 or in_channels != out_channels:
+            layers.append (
+                nn.Sequential (
+                    nn.Conv1d (in_channels, out_channels, 1,
+                               stride=stride, bias=False),
+                    nn.BatchNorm1d (out_channels)
+                )
+            )
+
+        layers.append (nn.ReLU (inplace=True))
+
+        return nn.Sequential (*layers)
 
     def _make_classifier (self, norm_layer: nn.Module, num_emotions: int, dropout: float) -> nn.Sequential:
         """Create a classification head"""
