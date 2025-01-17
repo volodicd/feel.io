@@ -86,7 +86,7 @@ class MultiHeadAttention(nn.Module):
             # Ensure mask matches attention scores shape
             if mask.dim () == 3:
                 mask = mask.unsqueeze (1)  # Add head dimension
-            scores = scores.masked_fill (mask == 0, -1e9)  # Use finite value instead of -inf
+            scores = scores.masked_fill (mask == 0, -1e4)  # Use finite value instead of -inf
 
         attn = F.softmax (scores, dim=-1)
         attn = self.attn_dropout (attn)
