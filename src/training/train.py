@@ -135,7 +135,7 @@ class EmotionTrainer:
         early_stop_counter = 0
         # Plot model architecture before training
         self.visualizer.plot_model_architecture(
-            self.model, input_shape=((1, 16000), (3, 224, 224), 50)
+            self.model, input_shape=((1, 16000), (1, 224, 224), 50)
         )
 
         for epoch in range (self.config['epochs']):
