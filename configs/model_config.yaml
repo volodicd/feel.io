@@ -3,12 +3,12 @@ model:
   rnn_hidden: 256
 
 dropouts:
-  image_encoder: 0.3
-  audio_encoder: 0.4
-  text_encoder: 0.5
-  fusion: 0.5
+  image_encoder: 0.2
+  audio_encoder: 0.2
+  text_encoder: 0.3
+  fusion: 0.3
   attention: 0.1
-  classifier: 0.4
+  classifier: 0.2
 
 attention:
   num_heads: 8
