@@ -51,7 +51,7 @@ class ModelVisualizer:
             device = next (model.parameters ()).device  # Get the model's device
             # Ensure dummy inputs have correct shapes
             dummy_audio = torch.randn (1, *input_shape[0]).to (device)
-            dummy_image = torch.randn (1, *input_shape[1]).to (device)  # [batch_size, channels, height, width]
+            dummy_image = torch.randn (1, input_shape[1][0], input_shape[1][1], input_shape[1][2]).to (device)
             dummy_text = torch.randint (0, 1000, (1, input_shape[2])).to (device)
 
             # Generate computational graph
