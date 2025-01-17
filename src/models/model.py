@@ -55,19 +55,21 @@ class ImprovedEmotionModel (nn.Module):
         # 2. Audio Encoder (1D conv blocks)
         # -------------------------------------------------------------
         self.audio_encoder = nn.Sequential (
-            # Initial 1D convolution
-            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),
+            # Initial 1D convolution - input: [batch, 1, sequence]
+            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),  # [batch, 64, sequence/2]
             nn.BatchNorm1d (64),
             nn.ReLU (inplace=True),
+            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),  # [batch, 64, sequence/4]
 
-            # 1D Residual blocks
-            self._make_audio_residual_block (64, 64),
-            self._make_audio_residual_block (64, 128, stride=2),
-            self._make_audio_residual_block (128, 256, stride=2),
+            # Audio residual blocks
+            self._make_audio_residual_block (64, 64),  # [batch, 64, sequence/4]
+            self._make_audio_residual_block (64, 128, 2),  # [batch, 128, sequence/8]
+            self._make_audio_residual_block (128, 256, 2),  # [batch, 256, sequence/16]
 
-            nn.AdaptiveAvgPool1d (1),
-            nn.Flatten (),
-            nn.Linear (256, 256)
+            nn.AdaptiveAvgPool1d (1),  # [batch, 256, 1]
+            nn.Flatten (),  # [batch, 256]
+            nn.Dropout (dropout),
+            nn.Linear (256, 256)  # [batch, 256]
         )
 
         # -------------------------------------------------------------
