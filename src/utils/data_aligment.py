@@ -106,6 +106,7 @@ def label_level_align(
             img_resampled = sample_or_oversample(img_group, target_size)
             aud_resampled = sample_or_oversample(aud_group, target_size)
             txt_resampled = sample_or_oversample(txt_group, target_size)
+            assert len (img_resampled) == len (aud_resampled) == len (txt_resampled) == target_size
             print (f"Emotion={emotion}, split={split},  ",
                    f"img_group={len (img_group)}, aud_group={len (aud_group)}, txt_group={len (txt_group)}, ",
                    f"target_size={target_size}, ",
