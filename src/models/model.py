@@ -283,13 +283,14 @@ class MultiModalLoss (nn.Module):
         for key in self.weights.keys ():
             pred_key = f'{key}_pred'
             if pred_key in outputs:
-                # Add focal loss component for imbalanced classes
+                # Calculate cross-entropy loss
                 logits = outputs[pred_key]
                 ce_loss = self.criterion (logits, targets)
 
-                # Add L2 regularization
-                l2_reg = sum (torch.sum (p ** 2) for p in outputs[pred_key].parameters ()) * 0.0001
+                # Add L2 regularization (apply only to model weights, not outputs)
+                l2_reg = sum (torch.sum (p ** 2) for p in self.parameters ()) * 0.0001
 
+                # Combine losses
                 loss_val = ce_loss + l2_reg
                 total_loss += self.weights[key] * loss_val
 
