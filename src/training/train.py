@@ -222,6 +222,8 @@ class EmotionTrainer:
             with torch.amp.autocast (device_type='cuda'):
                 outputs = self.model (image=image, audio=audio, text_input=text_input)
                 loss = self.criterion (outputs, targets)
+                # Scale loss by accumulation steps
+                loss = loss / self.config['accumulation_steps']
 
             # Scaled backpropagation
             self.scaler.scale (loss).backward ()
@@ -237,7 +239,7 @@ class EmotionTrainer:
             self.scaler.update ()
 
             # Update metrics
-            total_loss += loss.item ()
+            total_loss += loss.item ()*  self.config['accumulation_steps']
 
             with torch.no_grad ():
                 for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
@@ -363,16 +365,17 @@ def main ():
     config = {
         'batch_size': 16,
         'num_workers': 4,
-        'learning_rate': 5e-5,
-        'weight_decay': 1e-4,
+        'learning_rate': 1e-4,
+        'weight_decay': 5e-4,
         'epochs': 20,
         'patience': 5,
-        'scheduler_patience': 3,
-        'grad_clip': 1.0,
-        'warmup_steps': 1000,
+        'scheduler_patience': 5,
+        'grad_clip': 0.5,
+        'warmup_steps': 3000,
         'pin_memory': True,
         'cuda_non_blocking': True,
         'amp': True,
+        'accumulation_steps': 2,  # Add this
     }
 
     def get_lr_schedule (optimizer, warmup_steps):

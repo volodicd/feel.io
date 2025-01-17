@@ -54,21 +54,22 @@ class ImprovedEmotionModel (nn.Module):
         # 2. Audio Encoder (1D conv blocks)
         # -------------------------------------------------------------
         self.audio_encoder = nn.Sequential (
-            # Initial 1D convolution - input: [batch, 1, sequence]
-            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),  # [batch, 64, sequence/2]
+            nn.Conv1d (1, 64, kernel_size=7, stride=2, padding=3),
             nn.BatchNorm1d (64),
             nn.ReLU (inplace=True),
-            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),  # [batch, 64, sequence/4]
+            nn.MaxPool1d (kernel_size=3, stride=2, padding=1),
 
-            # Audio residual blocks
-            ResidualBlock1D (64, 64),  # [batch, 64, sequence/4]
-            ResidualBlock1D (64, 128, 2),  # [batch, 128, sequence/8]
-            ResidualBlock1D (128, 256, 2),  # [batch, 256, sequence/16]
+            ResidualBlock1D (64, 64),
+            ResidualBlock1D (64, 64),  # Add extra block
+            ResidualBlock1D (64, 128, 2),
+            ResidualBlock1D (128, 128),  # Add extra block
+            ResidualBlock1D (128, 256, 2),
+            ResidualBlock1D (256, 256),  # Add extra block
 
-            nn.AdaptiveAvgPool1d (1),  # [batch, 256, 1]
-            nn.Flatten (),  # [batch, 256]
+            nn.AdaptiveAvgPool1d (1),
+            nn.Flatten (),
             nn.Dropout (dropout),
-            nn.Linear (256, 256)  # [batch, 256]
+            nn.Linear (256, 256)
         )
 
         # -------------------------------------------------------------
@@ -209,9 +210,9 @@ class ImprovedEmotionModel (nn.Module):
 
         # Create proper attention mask
         # First expand for number of attention heads
-        presence_mask = presence_mask.unsqueeze (1)  # [batch_size, 1, 3]
-        # Then expand to proper shape [batch_size, num_heads, seq_len_q, seq_len_k]
-        attention_mask = presence_mask.unsqueeze (2).expand (batch_size, self.fusion_attention.num_heads, 3, 3)
+        presence_mask = presence_mask.unsqueeze(1)  # [batch_size, 1, 3]
+        cross_modal_mask = torch.matmul (presence_mask.unsqueeze (-1), presence_mask.unsqueeze (-2))
+        attention_mask = cross_modal_mask.expand (batch_size, self.fusion_attention.num_heads, 3, 3)
 
         # Apply attention
         attended_features, _ = self.fusion_attention (
@@ -278,20 +279,12 @@ class MultiModalLoss (nn.Module):
 
     def forward (self, outputs, targets):
         total_loss = 0.0
-        batch_size = targets.size (0)
 
         for key in self.weights.keys ():
             pred_key = f'{key}_pred'
             if pred_key in outputs:
-                # Calculate cross-entropy loss
-                logits = outputs[pred_key]
-                ce_loss = self.criterion (logits, targets)
-
-                # Add L2 regularization (apply only to model weights, not outputs)
-                l2_reg = sum (torch.sum (p ** 2) for p in self.parameters ()) * 0.0001
-
-                # Combine losses
-                loss_val = ce_loss + l2_reg
+                # Just use cross entropy loss - L2 regularization should be handled by optimizer
+                loss_val = self.criterion (outputs[pred_key], targets)
                 total_loss += self.weights[key] * loss_val
 
         return total_loss
