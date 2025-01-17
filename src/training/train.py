@@ -1,4 +1,5 @@
-import os
+# src/training/train.py
+
 import torch
 import pandas as pd
 from pathlib import Path
@@ -7,13 +8,15 @@ from datetime import datetime
 from tqdm import tqdm
 import numpy as np
 from typing import Dict, Tuple
+from sklearn.metrics import confusion_matrix
+
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, RandomSampler
 # Import from your project structure
 from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
 from src.utils.visualization import ModelVisualizer, LRFinder
-from src.utils.data_aligment import align_datasets
+from src.utils.data_aligment import align_datasets, label_level_align
 
 
 class EmotionTrainer:
@@ -29,23 +32,25 @@ class EmotionTrainer:
         self.setup_device ()
         self.setup_tensorboard ()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+        self.scaler = torch.amp.GradScaler()  # For mixed precision training
 
     def setup_device (self):
-        """Setup device for training with proper initialization for M1"""
-        # Enable MPS fallback for unsupported operations
-        os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+        """Setup CUDA device for training with proper initialization"""
+        if not torch.cuda.is_available ():
+            raise RuntimeError ("This script requires CUDA GPU. No GPU found!")
 
-        if torch.backends.mps.is_available ():
-            self.device = torch.device ("mps")
-            logging.info ("Using Apple M1 GPU (MPS) with CPU fallback for unsupported operations")
-            logging.info (
-                f"PYTORCH_ENABLE_MPS_FALLBACK is set to: {os.getenv ('PYTORCH_ENABLE_MPS_FALLBACK', 'Not Set')}")
-        else:
-            self.device = torch.device ("cpu")
-            logging.info ("MPS not available, using CPU")
+        self.device = torch.device ("cuda")
+        gpu_id = torch.cuda.current_device ()
+        gpu_name = torch.cuda.get_device_name (gpu_id)
+        logging.info (f"Using CUDA Device {gpu_id}: {gpu_name}")
 
-        logging.info (f"PyTorch version: {torch.__version__}")
-        logging.info (f"Device: {self.device}")
+        # Enable CUDA optimization
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+
+        # Log GPU information
+        total_memory = torch.cuda.get_device_properties (gpu_id).total_memory
+        logging.info (f"Total GPU Memory: {total_memory / 1e9:.2f} GB")
 
     def setup_logging (self):
         """Initialize logging configuration"""
@@ -57,8 +62,10 @@ class EmotionTrainer:
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler (handler)
 
+        # Create log file path
         log_file = self.log_dir / 'training.log'
 
+        # Configure root logger
         logging.basicConfig (
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
@@ -68,6 +75,7 @@ class EmotionTrainer:
             ]
         )
 
+        # Log initial training information
         logging.info (f"{'=' * 50}")
         logging.info ("Training Session Started")
         logging.info (f"Timestamp: {timestamp}")
@@ -89,65 +97,30 @@ class EmotionTrainer:
         self.writer = SummaryWriter (self.log_dir / 'tensorboard')
 
     def setup_model (self):
-        """Initialize model and move components to appropriate devices"""
-        try:
-            # Initialize model
-            self.model = ImprovedEmotionModel (
-                num_emotions=len (self.emotion_labels),
-                dropout=0.5,
-                vocab_size=20000,
-                embed_dim=128,
-                rnn_hidden=256
-            )
-
-            # Audio components stay on CPU
-            self.model.audio_encoder = self.model.audio_encoder.to ('cpu', dtype=torch.float32)
-            self.model.audio_norm = self.model.audio_norm.to ('cpu', dtype=torch.float32)
-
-            # Other components go to MPS/CPU depending on availability
-            components_to_device = [
-                'image_encoder', 'text_embedding', 'text_rnn', 'text_proj',
-                'cross_attention', 'image_norm', 'text_norm', 'fusion_norm'
-            ]
-
-            for component in components_to_device:
-                if hasattr (self.model, component):
-                    setattr (self.model, component,
-                             getattr (self.model, component).to (self.device, dtype=torch.float32))
-
-            # Handle classifiers
-            for name, classifier in self.model.classifiers.items ():
-                if name == 'audio':
-                    classifier.to ('cpu', dtype=torch.float32)
-                else:
-                    classifier.to (self.device, dtype=torch.float32)
-
-            # Initialize loss and optimizers
-            self.criterion = MultiModalLoss ().to (self.device, dtype=torch.float32)
-            self.optimizer = torch.optim.AdamW (
-                self.model.parameters (),
-                lr=self.config['learning_rate'],
-                weight_decay=self.config['weight_decay']
-            )
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau (
-                self.optimizer,
-                mode='min',
-                patience=self.config['scheduler_patience'],
-                factor=0.5,
-                verbose=True
-            )
-
-        except Exception as e:
-            logging.error (f"Error in model setup: {str (e)}")
-            raise
+        """Initialize model, optimizer, criterion and scheduler with CUDA support"""
+        self.model = ImprovedEmotionModel ().cuda ()
+        self.criterion = MultiModalLoss ().cuda ()
+        self.optimizer = torch.optim.AdamW (
+            self.model.parameters (),
+            lr=self.config['learning_rate'],
+            weight_decay=self.config['weight_decay']
+        )
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau (
+            self.optimizer,
+            mode='min',
+            patience=self.config['scheduler_patience'],
+            factor=0.5,
+            verbose=True
+        )
 
     def train (self, train_loader: DataLoader, val_loader: DataLoader):
-        """Main training loop"""
+        """Main training loop with CUDA optimizations"""
         self.setup_model ()
         best_acc = 0.0
         early_stop_counter = 0
 
         for epoch in range (self.config['epochs']):
+
             # Training phase
             train_loss, train_metrics = self.train_epoch (train_loader, epoch)
             logging.info (f"\n{'-' * 20} Epoch {epoch + 1}/{self.config['epochs']} {'-' * 20}")
@@ -155,6 +128,7 @@ class EmotionTrainer:
             logging.info (f"  Loss: {train_loss:.4f}")
             logging.info (f"  Image Accuracy: {train_metrics['image_accuracy']:.4f}")
             logging.info (f"  Audio Accuracy: {train_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Text Accuracy: {train_metrics['text_accuracy']:.4f}")
             logging.info (f"  Fusion Accuracy: {train_metrics['fusion_accuracy']:.4f}")
 
             # Validation phase
@@ -163,7 +137,9 @@ class EmotionTrainer:
             logging.info (f"  Loss: {val_loss:.4f}")
             logging.info (f"  Image Accuracy: {val_metrics['image_accuracy']:.4f}")
             logging.info (f"  Audio Accuracy: {val_metrics['audio_accuracy']:.4f}")
+            logging.info (f"  Text Accuracy: {val_metrics['text_accuracy']:.4f}")
             logging.info (f"  Fusion Accuracy: {val_metrics['fusion_accuracy']:.4f}")
+
 
             # Update learning rate scheduler
             self.scheduler.step (val_loss)
@@ -172,9 +148,22 @@ class EmotionTrainer:
             self.log_metrics (train_metrics, 'train', epoch)
             self.log_metrics (val_metrics, 'val', epoch)
 
+            # Log GPU memory usage
+            memory_allocated = torch.cuda.memory_allocated (0)
+            memory_cached = torch.cuda.memory_reserved (0)
+            logging.info ("Resources:")
+            logging.info (f"  GPU Memory Allocated: {memory_allocated / 1e9:.2f}GB")
+            logging.info (f"  GPU Memory Cached: {memory_cached / 1e9:.2f}GB")
+
             # Check for improvement
-            if val_metrics['fusion_accuracy'] > best_acc:
-                best_acc = val_metrics['fusion_accuracy']
+            average_val_accuracy = (
+                                           val_metrics['image_accuracy'] +
+                                           val_metrics['audio_accuracy'] +
+                                           val_metrics['text_accuracy'] +
+                                           val_metrics['fusion_accuracy']
+                                   ) / 4
+            if average_val_accuracy > best_acc:
+                best_acc = average_val_accuracy
                 self.save_checkpoint (epoch, val_metrics)
                 early_stop_counter = 0
                 logging.info (f"New best accuracy: {best_acc:.4f}")
@@ -185,147 +174,108 @@ class EmotionTrainer:
                 logging.info ("Early stopping triggered")
                 break
 
+            # Clear cache periodically
+            torch.cuda.empty_cache ()
+
+
         logging.info (f"Best validation accuracy: {best_acc:.4f}")
         self.writer.close ()
 
+    # In train.py, update the train_epoch method
     def train_epoch (self, train_loader: DataLoader, epoch: int) -> Tuple[float, Dict]:
-        """Train for one epoch"""
         self.model.train ()
         total_loss = 0.0
-        predictions = {'image': [], 'audio': [], 'fusion': []}
+        predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
 
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
-        for idx, batch in enumerate (progress_bar):
-            try:
-                # Process audio on CPU
-                audio = batch['audio'].to ('cpu', dtype=torch.float32).contiguous ()
-                audio_features = self.model.audio_encoder (audio)
+        for batch in progress_bar:
+            # Move data to GPU
+            audio = batch['audio'].cuda (non_blocking=True)
+            image = batch['image'].cuda (non_blocking=True)
+            text_input = batch['text'].cuda (non_blocking=True)
+            targets = batch['emotion'].cuda (non_blocking=True)
 
-                # Log shapes for debugging
-                if idx == 0:  # Only log first batch
-                    logging.info (f"Audio input shape: {audio.shape}")
-                    logging.info (f"Audio features shape before squeeze: {audio_features.shape}")
+            # Clear gradients
+            self.optimizer.zero_grad (set_to_none=True)
 
-                # Remove the last dimension if it's 1
-                if audio_features.size (-1) == 1:
-                    audio_features = audio_features.squeeze (-1)
-                    if idx == 0:  # Only log first batch
-                        logging.info (f"Audio features shape after squeeze: {audio_features.shape}")
-
-                audio_features = self.model.audio_norm (audio_features)
-                audio_pred = self.model.classifiers['audio'] (audio_features)
-
-                # Process other inputs on MPS/CPU
-                image = batch['image'].to (self.device, dtype=torch.float32).contiguous ()
-                targets = batch['emotion'].to (self.device, dtype=torch.long).contiguous ()
-
-                # Move audio predictions to main device for loss calculation
-                audio_pred = audio_pred.to (self.device)
-
-                # Clear gradients
-                self.optimizer.zero_grad (set_to_none=True)
-
-                # Forward pass
-                outputs = self.model (
-                    image=image,
-                    audio=audio,
-                    audio_features=audio_features.to (self.device),
-                    text_input=batch.get ('text', None)
-                )
-
-                outputs['audio_pred'] = audio_pred
+            # Mixed precision forward pass
+            with torch.amp.autocast (device_type='cuda'):
+                outputs = self.model (image=image, audio=audio, text_input=text_input)
                 loss = self.criterion (outputs, targets)
 
-                # Check for NaN/Inf values
-                if not torch.isfinite (loss):
-                    raise ValueError (f"Loss is {loss}, training cannot continue")
+            # Scaled backpropagation
+            self.scaler.scale (loss).backward ()
 
-                # Backward pass
-                loss.backward ()
+            if self.config.get ('grad_clip'):
+                self.scaler.unscale_ (self.optimizer)
+                torch.nn.utils.clip_grad_norm_ (
+                    self.model.parameters (),
+                    self.config['grad_clip']
+                )
 
-                if self.config.get ('grad_clip'):
-                    torch.nn.utils.clip_grad_norm_ (
-                        self.model.parameters (),
-                        self.config['grad_clip']
-                    )
+            self.scaler.step (self.optimizer)
+            self.scaler.update ()
 
-                self.optimizer.step ()
+            # Update metrics
+            total_loss += loss.item ()
 
-                # Update metrics
-                total_loss += loss.item ()
-
-                with torch.no_grad ():
-                    for key in outputs:
+            with torch.no_grad ():
+                for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
+                    if key in outputs:
                         pred = outputs[key].argmax (1).cpu ()
                         predictions[key.replace ('_pred', '')].extend (pred.numpy ())
-                    all_targets.extend (targets.cpu ().numpy ())
+                all_targets.extend (targets.cpu ().numpy ())
 
-                # Update progress bar
-                progress_bar.set_postfix ({'loss': loss.item ()})
-
-            except Exception as e:
-                logging.error (f"Error in training batch: {str (e)}")
-                continue
+            # Update progress bar
+            used_memory = torch.cuda.memory_allocated () / 1e9
+            progress_bar.set_postfix ({
+                'loss': loss.item (),
+                'GPU Memory': f'{used_memory:.2f}GB'
+            })
 
         metrics = {
             'loss': total_loss / len (train_loader),
             'true_labels': np.array (all_targets)
         }
-        for key, preds in predictions.items ():
-            metrics[f'{key}_accuracy'] = np.mean (
-                np.array (preds) == metrics['true_labels']
-            )
+
+        # Calculate accuracies for all available modalities
+        for key in predictions:
+            if predictions[key]:  # Only calculate if predictions exist
+                metrics[f'{key}_accuracy'] = np.mean (
+                    np.array (predictions[key]) == metrics['true_labels']
+                )
+
 
         return metrics['loss'], metrics
 
     @torch.no_grad ()
     def validate (self, val_loader: DataLoader, epoch: int) -> Tuple[float, Dict, Dict]:
-        """Validate the model"""
+        """Validate the model with CUDA optimizations"""
         self.model.eval ()
         total_loss = 0.0
-        predictions = {'image': [], 'audio': [], 'fusion': []}
+        predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
 
-        for batch in tqdm (val_loader, desc='Validation'):
-            try:
-                # Process audio on CPU
-                audio = batch['audio'].to ('cpu', dtype=torch.float32).contiguous ()
-                audio_features = self.model.audio_encoder (audio)
-                # Remove the last dimension if it's 1
-                if audio_features.size (-1) == 1:
-                    audio_features = audio_features.squeeze (-1)
-                audio_features = self.model.audio_norm (audio_features)
-                audio_pred = self.model.classifiers['audio'] (audio_features)
+        stream = torch.cuda.Stream ()
+        with torch.cuda.stream (stream):
+            for batch in tqdm (val_loader, desc='Validation'):
+                audio = batch['audio'].cuda (non_blocking=True)
+                image = batch['image'].cuda (non_blocking=True)
+                text_input = batch['text'].cuda (non_blocking=True)
+                targets = batch['emotion'].cuda (non_blocking=True)
 
-                # Process other inputs on MPS/CPU
-                image = batch['image'].to (self.device, dtype=torch.float32).contiguous ()
-                targets = batch['emotion'].to (self.device, dtype=torch.long).contiguous ()
-
-                # Move audio predictions to main device for loss calculation
-                audio_pred = audio_pred.to (self.device)
-
-                # Forward pass
-                outputs = self.model (
-                    image=image,
-                    audio=audio,
-                    audio_features=audio_features.to (self.device),
-                    text_input=batch.get ('text', None)
-                )
-
-                outputs['audio_pred'] = audio_pred
-                loss = self.criterion (outputs, targets)
+                with torch.amp.autocast(device_type='cuda'):
+                    outputs = self.model (image=image, audio=audio, text_input=text_input)  # Include text input
+                    loss = self.criterion (outputs, targets)
 
                 total_loss += loss.item ()
-
                 for key in outputs:
                     pred = outputs[key].argmax (1).cpu ()
                     predictions[key.replace ('_pred', '')].extend (pred.numpy ())
                 all_targets.extend (targets.cpu ().numpy ())
 
-            except Exception as e:
-                logging.error (f"Error in validation batch: {str (e)}")
-                continue
+        torch.cuda.synchronize ()
 
         metrics = {
             'loss': total_loss / len (val_loader),
@@ -335,6 +285,26 @@ class EmotionTrainer:
             metrics[f'{key}_accuracy'] = np.mean (
                 np.array (preds) == metrics['true_labels']
             )
+        all_preds_fusion = np.array (predictions['fusion'])
+        fusion_conf_matrix = confusion_matrix (all_targets, all_preds_fusion)
+        logging.info (f"Confusion Matrix for Fusion:\n{fusion_conf_matrix}")
+        if len (predictions['image']) > 0:
+            all_preds_image = np.array (predictions['image'])
+            image_conf_matrix = confusion_matrix (all_targets, all_preds_image)
+            logging.info (f"Confusion Matrix for Image:\n{image_conf_matrix}")
+
+            # 2) Audio
+        if len (predictions['audio']) > 0:
+            all_preds_audio = np.array (predictions['audio'])
+            audio_conf_matrix = confusion_matrix (all_targets, all_preds_audio)
+            logging.info (f"Confusion Matrix for Audio:\n{audio_conf_matrix}")
+
+            # 3) Text
+        if len (predictions['text']) > 0:
+            all_preds_text = np.array (predictions['text'])
+            text_conf_matrix = confusion_matrix (all_targets, all_preds_text)
+            logging.info (f"Confusion Matrix for Text:\n{text_conf_matrix}")
+
         return metrics['loss'], metrics, predictions
 
     def save_checkpoint (self, epoch: int, metrics: Dict):
@@ -344,6 +314,7 @@ class EmotionTrainer:
             'model_state_dict': self.model.state_dict (),
             'optimizer_state_dict': self.optimizer.state_dict (),
             'scheduler_state_dict': self.scheduler.state_dict (),
+            'scaler_state_dict': self.scaler.state_dict (),  # Save AMP scaler
             'metrics': metrics,
             'config': self.config
         }
@@ -353,10 +324,11 @@ class EmotionTrainer:
 
     def load_checkpoint (self, checkpoint_path: str):
         """Load model checkpoint"""
-        checkpoint = torch.load (checkpoint_path, map_location='cpu')
+        checkpoint = torch.load (checkpoint_path, map_location='cuda')
         self.model.load_state_dict (checkpoint['model_state_dict'])
         self.optimizer.load_state_dict (checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict (checkpoint['scheduler_state_dict'])
+        self.scaler.load_state_dict (checkpoint['scaler_state_dict'])
         return checkpoint['epoch'], checkpoint['metrics']
 
     def log_metrics (self, metrics: Dict, phase: str, epoch: int):
@@ -368,22 +340,19 @@ class EmotionTrainer:
 
 
 def main ():
-    # Set multiprocessing start method to 'fork' to match Linux/CUDA behavior
-    import multiprocessing
-    if multiprocessing.get_start_method (allow_none=True) != 'fork':
-        multiprocessing.set_start_method ('fork', force=True)
-
-    # Configuration optimized for M1
+    # Configuration optimized for CUDA
     config = {
-        'batch_size': 32,  # M1 can handle larger batches
-        'num_workers': 4,  # Adjusted for M1
-        'learning_rate': 1e-3,
-        'weight_decay': 1e-4,
-        'epochs': 100,
-        'patience': 15,
-        'scheduler_patience': 5,
-        'grad_clip': 1.0,
-        'pin_memory': True
+        'batch_size': 16,
+        'num_workers': 4,
+        'learning_rate': 1e-4,
+        'weight_decay': 1e-3,
+        'epochs': 10,
+        'patience': 2,
+        'scheduler_patience': 7,
+        'grad_clip': 0.5,
+        'pin_memory': True,
+        'cuda_non_blocking': True,
+        'amp': True,
     }
 
     try:
@@ -395,13 +364,42 @@ def main ():
         ])
         audio_data = pd.read_csv ('data/processed/ravdess.csv')
         text_data = pd.read_csv ('data/processed/goemotions.csv')
-
+        max_token = text_data['text'].max()
+        print(f"Max token: {max_token}")
         # Align datasets
-        logging.info ("Aligning datasets...")
-        aligned_data = align_datasets (image_data, audio_data, text_data)
+        print ("=== Checking distribution BEFORE alignment ===")
+        for emotion in range (7):
+            for split in ["train", "test"]:
+                count_img = len (image_data[(image_data["emotion"] == emotion) & (image_data["split"] == split)])
+                count_aud = len (audio_data[(audio_data["emotion"] == emotion) & (audio_data["split"] == split)])
+                count_txt = len (text_data[(text_data["emotion"] == emotion) & (text_data["split"] == split)])
+                print (f"emotion={emotion}, split={split}, "
+                       f"count_img={count_img}, count_aud={count_aud}, count_txt={count_txt}")
 
+        logging.info ("Aligning datasets...")
+        aligned_data = label_level_align(image_data, audio_data, text_data)
+        if aligned_data is None:
+            print ("aligned_data returned None—no overlap found!")
+        else:
+            print ("\n=== Checking distribution AFTER alignment ===")
+            for dom in ["image", "audio", "text"]:
+                df_dom = aligned_data[dom]
+                print (f"---- {dom.upper ()} TRAIN ----")
+                print (df_dom[df_dom["split"] == "train"]["emotion"].value_counts ())
+                print (f"---- {dom.upper ()} TEST ----")
+                print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
+        print ("Image domain total:", len (aligned_data["image"]))
+        print ("Audio domain total:", len (aligned_data["audio"]))
+        print ("Text domain total:", len (aligned_data["text"]))
+
+        print ("Train images:", len (aligned_data["image"][aligned_data["image"]["split"] == "train"]))
+        print ("Test images:", len (aligned_data["image"][aligned_data["image"]["split"] == "test"]))
+        print ("Train audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "train"]))
+        print ("Test audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "test"]))
+        print ("Train Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "train"]))
+        print ("Test Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "test"]))
 
         logging.info (
             f"Aligned dataset sizes - Train: {len (aligned_data['image'][aligned_data['image']['split'] == 'train'])}, "
@@ -422,15 +420,14 @@ def main ():
             split='test'
         )
 
-        # Data loaders with specific multiprocessing context
-        import torch.multiprocessing as mp
+        # Data loaders
         train_loader = DataLoader (
             train_dataset,
-            batch_size=config['batch_size'],
+            batch_size = config['batch_size'],
             sampler=RandomSampler (train_dataset),
             num_workers=config['num_workers'],
             pin_memory=config['pin_memory'],
-            multiprocessing_context=mp.get_context ('fork')
+            persistent_workers=True
         )
 
         val_loader = DataLoader (
@@ -438,7 +435,8 @@ def main ():
             batch_size=config['batch_size'],
             shuffle=False,
             num_workers=config['num_workers'],
-            pin_memory=config['pin_memory']
+            pin_memory=config['pin_memory'],
+            persistent_workers=True
         )
 
         # Initialize and train

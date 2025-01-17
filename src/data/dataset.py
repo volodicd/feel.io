@@ -102,10 +102,10 @@ class MultiModalEmotionDataset(Dataset):
 
         # Emotion label
         emotion = self.image_data.iloc[idx]['emotion']
-
+        audio = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0)
         return {
             'image': image,
-            'audio': torch.tensor (waveform, dtype=torch.float32).unsqueeze (0),
+            'audio': audio,
             'text': text_tensor,
             'emotion': torch.tensor (emotion, dtype=torch.long)
         }

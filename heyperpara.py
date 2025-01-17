@@ -1,6 +1,6 @@
 import pandas as pd
 from src.data.dataset import MultiModalEmotionDataset
-from src.optimization.hyper_cuda import EnhancedHyperparameterOptimizer
+from src.optimization.hyper import EnhancedHyperparameterOptimizer
 
 def main():
     # Load datasets
