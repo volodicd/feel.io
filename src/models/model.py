@@ -81,7 +81,7 @@ class ImprovedEmotionModel(nn.Module):
         # -------------------------------------------------------------
         # 3. Text Encoder
         # -------------------------------------------------------------
-        self.embed_dim = text_config['embed_dim']
+        self.embed_dim = text_config['embedding_dim']
         self.rnn_hidden = model_config['rnn_hidden']
 
         self.text_embedding = nn.Embedding(num_embeddings=text_config['vocab_size'],
