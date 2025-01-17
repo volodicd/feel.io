@@ -375,7 +375,7 @@ def main ():
         'pin_memory': True,
         'cuda_non_blocking': True,
         'amp': True,
-        'accumulation_steps': 2,  # Add this
+        'accumulation_steps': 4,  # Add this
     }
 
     def get_lr_schedule (optimizer, warmup_steps):
@@ -412,6 +412,10 @@ def main ():
         if aligned_data is None:
             print ("aligned_data returned None—no overlap found!")
         else:
+            train_ratio = 0.3  # Use 30% of data for faster experiments
+            train_size = int (len (aligned_data['image']) * train_ratio)
+            for key in aligned_data:
+                aligned_data[key] = aligned_data[key].sample (n=train_size, random_state=42)
             print ("\n=== Checking distribution AFTER alignment ===")
             for dom in ["image", "audio", "text"]:
                 df_dom = aligned_data[dom]
@@ -421,6 +425,7 @@ def main ():
                 print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
+
         print ("Image domain total:", len (aligned_data["image"]))
         print ("Audio domain total:", len (aligned_data["audio"]))
         print ("Text domain total:", len (aligned_data["text"]))
@@ -469,6 +474,7 @@ def main ():
             pin_memory=config['pin_memory'],
             persistent_workers=True
         )
+
 
         # Initialize and train
         trainer = EmotionTrainer (config)
