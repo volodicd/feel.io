@@ -28,6 +28,7 @@ class ImprovedEmotionModel(nn.Module):
 
         model_config = self.config['model']
         attention_config = self.config['attention']
+        dropouts = self.config['dropouts']
         fusion_config = self.config['fusion']
         image_config = self.config['image_encoder']
         audio_config = self.config['audio_encoder']
@@ -52,7 +53,7 @@ class ImprovedEmotionModel(nn.Module):
             # Global pooling and final projection
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Dropout(model_config['dropout']),
+            nn.Dropout(dropouts['image_encoder']),
             nn.Linear(image_config['channels'][2], image_config['channels'][2])
         )
 
@@ -74,7 +75,7 @@ class ImprovedEmotionModel(nn.Module):
 
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
-            nn.Dropout(model_config['dropout']),
+            nn.Dropout(dropouts['audio_encoder']),
             nn.Linear(audio_config['channels'][2], audio_config['channels'][2])
         )
 
@@ -114,7 +115,7 @@ class ImprovedEmotionModel(nn.Module):
         self.fusion_attention = MultiHeadAttention(
             dim=self.modality_dim,
             num_heads=attention_config['num_heads'],
-            dropout=attention_config['dropout']
+            dropout=dropouts['attention']
         )
 
         # Fusion MLP
@@ -122,7 +123,7 @@ class ImprovedEmotionModel(nn.Module):
             nn.Linear(self.modality_dim * 3, fusion_config['mlp_hidden']),
             nn.LayerNorm(fusion_config['mlp_hidden']),
             nn.ReLU(),
-            nn.Dropout(model_config['dropout']),
+            nn.Dropout(dropouts['fusion']),
             nn.Linear(fusion_config['mlp_hidden'], fusion_config['modality_dim'])
         )
 
@@ -143,7 +144,7 @@ class ImprovedEmotionModel(nn.Module):
         ]
 
         self.classifiers = nn.ModuleDict({
-            name: self._make_classifier(norm_layer, model_config['num_emotions'], model_config['dropout'])
+            name: self._make_classifier(norm_layer, model_config['num_emotions'], dropouts['classifier'])
             for name, norm_layer in classifier_config
         })
 
