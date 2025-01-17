@@ -344,16 +344,25 @@ def main ():
     config = {
         'batch_size': 16,
         'num_workers': 4,
-        'learning_rate': 1e-4,
-        'weight_decay': 1e-3,
-        'epochs': 10,
-        'patience': 2,
-        'scheduler_patience': 7,
-        'grad_clip': 0.5,
+        'learning_rate': 5e-5,
+        'weight_decay': 1e-4,
+        'epochs': 20,
+        'patience': 5,
+        'scheduler_patience': 3,
+        'grad_clip': 1.0,
+        'warmup_steps': 1000,
         'pin_memory': True,
         'cuda_non_blocking': True,
         'amp': True,
     }
+
+    def get_lr_schedule (optimizer, warmup_steps):
+        def lr_lambda (step):
+            if step < warmup_steps:
+                return float (step) / float (max (1, warmup_steps))
+            return 1.0
+
+        return torch.optim.lr_scheduler.LambdaLR (optimizer, lr_lambda)
 
     try:
         # Load datasets

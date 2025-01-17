@@ -158,15 +158,19 @@ class ImprovedEmotionModel (nn.Module):
         )
 
     def init_weights (self):
-        """Initialize model weights"""
+        """Improved weight initialization"""
         for m in self.modules ():
             if isinstance (m, (nn.Conv2d, nn.Conv1d, nn.Linear)):
-                nn.init.kaiming_normal_ (m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.xavier_uniform_ (m.weight)
                 if m.bias is not None:
-                    nn.init.constant_ (m.bias, 0)
+                    nn.init.zeros_ (m.bias)
             elif isinstance (m, (nn.BatchNorm2d, nn.BatchNorm1d)):
-                nn.init.constant_ (m.weight, 1)
-                nn.init.constant_ (m.bias, 0)
+                nn.init.ones_ (m.weight)
+                nn.init.zeros_ (m.bias)
+        nn.init.normal_ (self.image_token, mean=0.0, std=0.02)
+        nn.init.normal_ (self.audio_token, mean=0.0, std=0.02)
+        nn.init.normal_ (self.text_token, mean=0.0, std=0.02)
+        nn.init.normal_ (self.presence_embedding, mean=0.0, std=0.02)
 
     def fuse_modalities (self, image_features: Optional[torch.Tensor] = None,
                          audio_features: Optional[torch.Tensor] = None,
@@ -273,12 +277,21 @@ class MultiModalLoss (nn.Module):
         if not np.isclose (sum (self.weights.values ()), 1.0):
             raise ValueError ("Loss weights must sum to 1")
 
-    def forward (self, outputs: Dict[str, torch.Tensor], targets: torch.Tensor) -> torch.Tensor:
-        """Compute weighted sum of losses"""
+    def forward (self, outputs, targets):
         total_loss = 0.0
+        batch_size = targets.size (0)
+
         for key in self.weights.keys ():
             pred_key = f'{key}_pred'
             if pred_key in outputs:
-                loss_val = self.criterion (outputs[pred_key], targets)
+                # Add focal loss component for imbalanced classes
+                logits = outputs[pred_key]
+                ce_loss = self.criterion (logits, targets)
+
+                # Add L2 regularization
+                l2_reg = sum (torch.sum (p ** 2) for p in outputs[pred_key].parameters ()) * 0.0001
+
+                loss_val = ce_loss + l2_reg
                 total_loss += self.weights[key] * loss_val
+
         return total_loss

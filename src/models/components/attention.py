@@ -69,29 +69,29 @@ class MultiHeadAttention(nn.Module):
         batch_size = q.size(0)
 
         # Project and reshape to [batch_size, seq_len, num_heads, head_dim]
-        q = self.q_linear(q).view(batch_size, -1, self.num_heads, self.head_dim)
-        k = self.k_linear(k).view(batch_size, -1, self.num_heads, self.head_dim)
-        v = self.v_linear(v).view(batch_size, -1, self.num_heads, self.head_dim)
+        q = self.q_linear (q).view (batch_size, -1, self.num_heads, self.head_dim)
+        k = self.k_linear (k).view (batch_size, -1, self.num_heads, self.head_dim)
+        v = self.v_linear (v).view (batch_size, -1, self.num_heads, self.head_dim)
 
-        # Transpose to [batch_size, num_heads, seq_len, head_dim]
-        q = q.transpose(1, 2)
-        k = k.transpose(1, 2)
-        v = v.transpose(1, 2)
+        # Transpose
+        q = q.transpose (1, 2)
+        k = k.transpose (1, 2)
+        v = v.transpose (1, 2)
 
-        # Scaled dot-product attention
-        scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        # Scaled dot-product attention with proper masking
+        scores = torch.matmul (q, k.transpose (-2, -1)) / math.sqrt (self.head_dim)
 
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, float('-inf'))
+            # Ensure mask matches attention scores shape
+            if mask.dim () == 3:
+                mask = mask.unsqueeze (1)  # Add head dimension
+            scores = scores.masked_fill (mask == 0, -1e9)  # Use finite value instead of -inf
 
-        attn = F.softmax(scores, dim=-1)
-        attn = self.attn_dropout(attn)
+        attn = F.softmax (scores, dim=-1)
+        attn = self.attn_dropout (attn)
 
-        out = torch.matmul(attn, v)  # [batch_size, num_heads, seq_len_q, head_dim]
-
-        # Reshape and project back
-        out = out.transpose(1, 2).contiguous().view(batch_size, -1, self.dim)
-        out = self.out(out)
-        out = self.out_dropout(out)
+        out = torch.matmul (attn, v)
+        out = out.transpose (1, 2).contiguous ().view (batch_size, -1, self.dim)
+        out = self.out (out)
 
         return out, attn
