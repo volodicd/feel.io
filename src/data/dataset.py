@@ -25,6 +25,7 @@ class EmotionAugmentation:
             split: 'train' or 'test'
         """
         self.split = split
+        self.full_config = config
         self.config = config['augmentation'][split]
 
         if split == 'train':
@@ -72,7 +73,7 @@ class EmotionAugmentation:
             return waveform
 
         if sr is None:
-            sr = self.config['preprocessing']['audio']['sample_rate']
+            sr = self.full_config['preprocessing']['audio']['sample_rate']
 
         # Pitch shift
         if random.random() < 0.5:
