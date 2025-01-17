@@ -58,8 +58,8 @@ class ModelVisualizer:
 
             # Generate computational graph
             with torch.no_grad ():
-                outputs = model (dummy_audio, dummy_image, dummy_text)
-                dot = make_dot (outputs['fusion_pred'], params=dict (model.named_parameters ()))
+                outputs = model.image_encoder[:-4] (dummy_image)  # Exclude Flatten, Dropout, and Linear layers
+                dot = make_dot (outputs, params=dict (model.named_parameters ()))
 
             # Save visualization
             output_path = self.viz_dir / "model_architecture"
