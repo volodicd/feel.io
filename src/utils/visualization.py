@@ -53,6 +53,8 @@ class ModelVisualizer:
             dummy_audio = torch.randn (1, *input_shape[0]).to (device)  # Audio: [1, samples]
             dummy_image = torch.randn (1, 3, *input_shape[1]).to (device)  # Image: [1, channels, height, width]
             dummy_text = torch.randint (0, 1000, (1, input_shape[2])).to (device)  # Text: [1, seq_len]
+            logging.info (
+                f"Audio shape: {dummy_audio.shape}, Image shape: {dummy_image.shape}, Text shape: {dummy_text.shape}")
 
             # Generate computational graph
             with torch.no_grad ():
