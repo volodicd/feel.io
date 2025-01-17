@@ -38,17 +38,17 @@ class EmotionTrainer:
         self.setup_device()
         self.setup_tensorboard()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-        self.scaler = torch.amp.GradScaler()  if self.config['mixed_precision'] else None
+        self.scaler = torch.amp.GradScaler()  # For mixed precision training
 
     def setup_device (self):
         """Setup CUDA device for training with proper initialization"""
         if not torch.cuda.is_available ():
             raise RuntimeError ("This script requires CUDA GPU. No GPU found!")
 
-        self.device = torch.device("cuda")
-        gpu_id = torch.cuda.current_device()
-        gpu_name = torch.cuda.get_device_name(gpu_id)
-        logging.info(f"Using CUDA Device {gpu_id}: {gpu_name}")
+        self.device = torch.device ("cuda")
+        gpu_id = torch.cuda.current_device ()
+        gpu_name = torch.cuda.get_device_name (gpu_id)
+        logging.info (f"Using CUDA Device {gpu_id}: {gpu_name}")
 
         # Enable CUDA optimization
         torch.backends.cudnn.benchmark = True
@@ -60,18 +60,24 @@ class EmotionTrainer:
 
     def setup_logging (self):
         """Initialize logging configuration"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_dir = Path('logs') / timestamp
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = self.log_dir/'training.log'
+        timestamp = datetime.now ().strftime ("%Y%m%d_%H%M%S")
+        self.log_dir = Path ('logs') / timestamp
+        self.log_dir.mkdir (parents=True, exist_ok=True)
+
+        # Reset any existing handlers
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler (handler)
+
+        # Create log file path
+        log_file = self.log_dir / 'training.log'
 
         # Configure root logger
-        logging.basicConfig(
+        logging.basicConfig (
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_file, mode='w', encoding='utf-8'),
-                logging.StreamHandler()
+                logging.FileHandler (log_file, mode='w', encoding='utf-8'),
+                logging.StreamHandler ()
             ]
         )
 
