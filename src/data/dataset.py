@@ -92,7 +92,8 @@ class EmotionAugmentation:
         return waveform
 
 class MultiModalEmotionDataset(Dataset):
-    def __init__(self, config_path: str = 'configs/dataset_config.yaml', split='train'):
+    def __init__(self, config_path: str = 'configs/dataset_config.yaml', split='train',
+                 image_data=None, audio_data=None, text_data=None):
         """
         Initialize dataset with configuration.
 
@@ -104,15 +105,23 @@ class MultiModalEmotionDataset(Dataset):
         self.split = split
 
         # Load data
-        self.image_data = pd.read_csv(self.config['paths']['fer2013'])
-        self.audio_data = pd.read_csv(self.config['paths']['ravdess'])
-        self.text_data = pd.read_csv(self.config['paths']['goemotions'])
+        if image_data is None:
+            self.image_data = pd.read_csv (self.config['paths']['fer2013'])
+            self.image_data = self.image_data[self.image_data['split'] == split].reset_index (drop=True)
+        else:
+            self.image_data = image_data
 
-        # Filter by split
-        self.image_data = self.image_data[self.image_data['split'] == split].reset_index(drop=True)
-        self.audio_data = self.audio_data[self.audio_data['split'] == split].reset_index(drop=True)
-        self.text_data = self.text_data[self.text_data['split'] == split].reset_index(drop=True)
+        if audio_data is None:
+            self.audio_data = pd.read_csv (self.config['paths']['ravdess'])
+            self.audio_data = self.audio_data[self.audio_data['split'] == split].reset_index (drop=True)
+        else:
+            self.audio_data = audio_data
 
+        if text_data is None:
+            self.text_data = pd.read_csv (self.config['paths']['goemotions'])
+            self.text_data = self.text_data[self.text_data['split'] == split].reset_index (drop=True)
+        else:
+            self.text_data = text_data
         # Initialize augmentation
         self.augmentation = EmotionAugmentation(self.config, split)
 

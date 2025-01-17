@@ -457,22 +457,18 @@ def main ():
         )
 
         # Data loaders
-        train_loader = DataLoader (
-            train_dataset,
-            batch_size = config['batch_size'],
-            sampler=RandomSampler (train_dataset),
-            num_workers=config['num_workers'],
-            pin_memory=config['pin_memory'],
-            persistent_workers=True
+        train_loader = MultiModalEmotionDataset (
+            image_data=aligned_data['image'],
+            audio_data=aligned_data['audio'],
+            text_data=aligned_data['text'],
+            split='train'
         )
 
-        val_loader = DataLoader (
-            val_dataset,
-            batch_size=config['batch_size'],
-            shuffle=False,
-            num_workers=config['num_workers'],
-            pin_memory=config['pin_memory'],
-            persistent_workers=True
+        val_loader = MultiModalEmotionDataset (
+            image_data=aligned_data['image'],
+            audio_data=aligned_data['audio'],
+            text_data=aligned_data['text'],
+            split='test'
         )
 
 
