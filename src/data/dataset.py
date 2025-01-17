@@ -92,9 +92,6 @@ class MultiModalEmotionDataset(Dataset):
         # Create tensor with correct shape [1, sequence_length]
         audio = torch.tensor (waveform, dtype=torch.float32).unsqueeze (0)  # Add channel dimension
 
-        # Verify shape
-        print (f"Audio tensor shape: {audio.shape}")  # Should be [1, sequence_length]
-
         # Process text
         text = self.text_data.iloc[idx]['text']
         encoded = self.tokenizer (
