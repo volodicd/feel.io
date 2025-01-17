@@ -38,6 +38,7 @@ class EmotionTrainer:
         self.setup_device()
         self.setup_tensorboard()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+        self.visualizer = ModelVisualizer (self.plot_dir)  # Initialize visualizer
         self.scaler = torch.amp.GradScaler()  # For mixed precision training
 
     def setup_device (self):
@@ -119,11 +120,23 @@ class EmotionTrainer:
             verbose=True
         )
 
+    def lr_finder(self, train_loader: DataLoader):
+        """Use LRFinder to determine the best learning rate."""
+        lr_finder = LRFinder (self.model, self.optimizer, self.criterion, self.device)
+        lrs, losses = lr_finder.range_test (train_loader, start_lr=1e-7, end_lr=1e-1, num_iter=100)
+        fig = lr_finder.plot_lr_find (lrs, losses)
+        fig.savefig (self.plot_dir / 'lr_finder.png')
+        logging.info ("Saved LR Finder plot.")
+
     def train (self, train_loader: DataLoader, val_loader: DataLoader):
         """Main training loop with CUDA optimizations"""
         self.setup_model ()
         best_acc = 0.0
         early_stop_counter = 0
+        # Plot model architecture before training
+        self.visualizer.plot_model_architecture(
+            self.model, input_shape=((1, 16000), (3, 224, 224), 50)
+        )
 
         for epoch in range (self.config['epochs']):
 
