@@ -424,7 +424,12 @@ class EmotionTrainer:
                     spec = spec.transpose (1, 2)  # [B, T, 64]
                     spec = self.normalize (spec)
                     spec = spec.transpose (1, 2)  # [B, 64, T]
-                    audio_features = self.audio_encoder (spec)
+
+                    # Extract real part of the spectrogram (avoiding complex types)
+                    real_part = spec.real  # Convert complex spectrogram to real values
+
+                    # Pass through audio encoder
+                    audio_features = self.audio_encoder (real_part)
                 else:
                     audio_features = None
 
