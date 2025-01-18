@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 from pathlib import Path
+import json
 import yaml
 import os
 import logging
@@ -387,34 +388,188 @@ class EmotionTrainer:
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
     def export_model (self, export_path: str):
-        """
-        Export the trained model to ONNX and TensorFlow.js compatible formats.
-        """
-        # Ensure the model is in evaluation mode
+        """Export model to ONNX with optimizations for browser deployment"""
         self.model.eval ()
+        os.makedirs (export_path, exist_ok=True)
 
-        # Dummy input for tracing
-        dummy_input = torch.randn (1, *self.config['model_config']['input_shape']).to (self.device)
+        # Create proper input shapes matching dataset and model expectations
+        dummy_inputs = {
+            'image': torch.randn (1, 1, 48, 48).to (self.device),
+            'audio': torch.randn (1, 1, 16000).to (self.device),  # Raw audio
+            'text_input': torch.randint (0, 30522, (1, 50)).to (self.device)  # BERT tokens
+        }
 
-        # Export to ONNX
-        onnx_path = os.path.join (export_path, 'emotion_model.onnx')
-        torch.onnx.export (
-            self.model,
-            dummy_input,
-            onnx_path,
-            export_params=True,
-            opset_version=11,
-            input_names=['input'],
-            output_names=['output']
-        )
-        logging.info (f'Exported model to ONNX format: {onnx_path}')
+        # Complete preprocessing wrapper that includes all necessary steps
+        class ModelWrapper (nn.Module):
+            def __init__ (self, model):
+                super ().__init__ ()
+                self.model = model
+                # Keep all preprocessing components
+                self.spectrogram = model.spectrogram
+                self.normalize = model.normalize
+                self.text_embedding = model.text_embedding
+                self.text_rnn = model.text_rnn
+                self.text_proj = model.text_proj
+                self.audio_encoder = model.audio_encoder
 
-        # Convert ONNX to TensorFlow.js (requires CLI tools)
-        os.system (f'onnx-tf convert -i {onnx_path} -o {export_path}/emotion_model_tf')
-        os.system (
-            f'tensorflowjs_converter --input_format=tf_saved_model --saved_model_dir={export_path}/emotion_model_tf --output_dir={export_path}/model_web')
-        logging.info (f'Converted ONNX model to TensorFlow.js format.')
+            def forward (self, image, audio, text_input):
+                # Process image (already preprocessed)
+                if image is not None:
+                    image_features = self.model.image_encoder (image)
+                else:
+                    image_features = None
 
+                # Process audio with full chain
+                if audio is not None:
+                    # 1. Convert to spectrogram
+                    spec = torch.log1p (self.spectrogram (audio))
+                    spec = spec.squeeze (1)
+                    # 2. Normalize
+                    spec = self.normalize (spec)
+                    # 3. Pass through audio encoder
+                    audio_features = self.audio_encoder (spec)
+                else:
+                    audio_features = None
+
+                # Process text with full chain
+                if text_input is not None:
+                    # 1. Embedding
+                    embedded = self.text_embedding (text_input)
+                    # 2. LSTM processing
+                    rnn_out, _ = self.text_rnn (embedded)
+                    # 3. Project and pool
+                    text_features = self.text_proj (rnn_out.mean (dim=1))
+                else:
+                    text_features = None
+
+                # Forward through main model with processed features
+                outputs = {}
+                if image_features is not None:
+                    outputs['image_pred'] = self.model.classifiers['image'] (image_features)
+                if audio_features is not None:
+                    outputs['audio_pred'] = self.model.classifiers['audio'] (audio_features)
+                if text_features is not None:
+                    outputs['text_pred'] = self.model.classifiers['text'] (text_features)
+
+                # Always do fusion if any modality is present
+                if any (x is not None for x in [image_features, audio_features, text_features]):
+                    fusion_features = self.model.fuse_modalities (
+                        image_features, audio_features, text_features
+                    )
+                    outputs['fusion_pred'] = self.model.classifiers['fusion'] (fusion_features)
+
+                return outputs
+
+        wrapped_model = ModelWrapper (self.model)
+
+        # Verify model behavior with all inputs and missing modalities
+        with torch.no_grad ():
+            # Test all modalities
+            outputs = wrapped_model (**dummy_inputs)
+            for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
+                assert key in outputs, f"Missing {key} in model outputs"
+                assert outputs[key].shape[1] == len (self.emotion_labels), \
+                    f"Shape mismatch for {key}"
+
+            # Test with missing modalities
+            outputs_img_only = wrapped_model (
+                image=dummy_inputs['image'],
+                audio=None,
+                text_input=None
+            )
+            assert 'fusion_pred' in outputs_img_only, "Fusion should work with single modality"
+
+        try:
+            # Export to ONNX with detailed dynamic axes
+            torch.onnx.export (
+                wrapped_model,
+                args=(dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']),
+                f=os.path.join (export_path, 'emotion_model.onnx'),
+                input_names=['image', 'audio', 'text_input'],
+                output_names=['image_pred', 'audio_pred', 'text_pred', 'fusion_pred'],
+                dynamic_axes={
+                    'image': {0: 'batch_size'},
+                    'audio': {0: 'batch_size'},  # FIXED - audio features are fixed size
+                    'text_input': {0: 'batch_size'},
+                    'image_pred': {0: 'batch_size'},
+                    'audio_pred': {0: 'batch_size'},
+                    'text_pred': {0: 'batch_size'},
+                    'fusion_pred': {0: 'batch_size'}
+                },
+                do_constant_folding=True,
+                opset_version=12,
+                keep_initializers_as_inputs=True,
+                verbose=True
+            )
+
+            # Save metadata (basic version - can be enhanced if needed)
+            model_metadata = {
+                'version': '1.0',
+                'input_shapes': {
+                    'image': [1, 48, 48],
+                    'audio': [1, 16000],  # Base size for 1 second
+                    'text': [50]
+                },
+                'preprocessing': {
+                    'image': {
+                        'size': [48, 48],
+                        'channels': 1,
+                        'normalize_mean': [0.5],
+                        'normalize_std': [0.5]
+                    },
+                    'audio': {
+                        'sample_rate': 16000,
+                        'mel_spec_params': {
+                            'n_mels': 64,
+                            'n_fft': 400,
+                            'win_length': 400,
+                            'hop_length': 160,
+                            'power': 2.0
+                        }
+                    },
+                    'text': {
+                        'max_length': 50,
+                        'vocab_size': 30522,
+                        'tokenizer': 'bert-base-uncased'
+                    }
+                },
+                'labels': self.emotion_labels
+            }
+
+            with open (os.path.join (export_path, 'model_metadata.json'), 'w') as f:
+                json.dump (model_metadata, f, indent=2)
+
+            # Verify exported model
+            try:
+                import onnx
+                import onnxruntime as ort
+
+                # Verify model structure
+                model = onnx.load (os.path.join (export_path, 'emotion_model.onnx'))
+                onnx.checker.check_model (model)
+
+                # Test inference
+                session = ort.InferenceSession (os.path.join (export_path, 'emotion_model.onnx'))
+                test_inputs = {
+                    'image': dummy_inputs['image'].cpu ().numpy (),
+                    'audio': dummy_inputs['audio'].cpu ().numpy (),
+                    'text_input': dummy_inputs['text_input'].cpu ().numpy ()
+                }
+                _ = session.run (None, test_inputs)
+                logging.info ('Model verification passed')
+
+            except ImportError:
+                logging.warning ('ONNX verification skipped - onnx/onnxruntime not installed')
+            except Exception as e:
+                logging.error (f'Model verification failed: {str (e)}')
+                raise
+
+        except Exception as e:
+            logging.error (f'Error during export: {str (e)}')
+            raise
+
+        logging.info (f'Model successfully exported to {export_path}')
+        return True
 
 def main ():
     trainer = EmotionTrainer('configs/training_config.yaml')
