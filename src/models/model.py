@@ -176,19 +176,21 @@ class ImprovedEmotionModel(nn.Module):
         nn.init.normal_(self.text_token, mean=0.0, std=0.02)
         nn.init.normal_(self.presence_embedding, mean=0.0, std=0.02)
 
-    def fuse_modalities (self, image_features=None, audio_features=None, text_features=None):
-        """
-        Improved fusion mechanism with adaptive modality weighting and attention.
-        """
-        batch_size = next (x.size (0) for x in [image_features, audio_features, text_features] if x is not None)
-        device = next (x.device for x in [image_features, audio_features, text_features] if x is not None)
 
-        # Initialize feature list and modality presence mask
+    def fuse_modalities (self, image_features: Optional[torch.Tensor] = None,
+                         audio_features: Optional[torch.Tensor] = None,
+                         text_features: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Advanced fusion mechanism using attention"""
+        batch_size = next (x.size (0) for x in [image_features, audio_features, text_features]
+                           if x is not None)
+        device = next (x.device for x in [image_features, audio_features, text_features]
+                       if x is not None)
+
+        # Initialize feature list and presence mask
         features = []
-        modality_weights = []
         presence_mask = torch.zeros (batch_size, 3, device=device)
 
-        # Process each modality with learnable weights
+        # Process each modality
         modalities = [
             (image_features, self.image_token, self.image_proj, 0),
             (audio_features, self.audio_token, self.audio_proj, 1),
@@ -201,14 +203,9 @@ class ImprovedEmotionModel(nn.Module):
                 proj_features = proj (features_tensor)
                 mod_token = token.expand (batch_size, -1, -1)
                 features.append (proj_features.unsqueeze (1) + mod_token)
-
-                # Learnable modality-specific weight
-                modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size, -1)
-                modality_weights.append (modality_weight)
-
                 presence_mask[:, idx] = 1
             else:
-                # Use learned token for missing modality
+                # Use learned token with presence embedding
                 mod_token = token.expand (batch_size, -1, -1)
                 absent_emb = self.presence_embedding[1:2].expand (batch_size, 1, -1)
                 features.append (mod_token + absent_emb)
@@ -216,22 +213,22 @@ class ImprovedEmotionModel(nn.Module):
         # Combine features
         combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
 
-        # Normalize modality weights
-        modality_weights = torch.stack (modality_weights, dim=1)  # [batch_size, 3, modality_dim]
-        modality_weights = torch.softmax (modality_weights, dim=1)  # Normalize across modalities
+        # Create proper attention mask
+        # First expand for number of attention heads
+        presence_mask = presence_mask.unsqueeze (1)  # [batch_size, 1, 3]
+        cross_modal_mask = torch.matmul (presence_mask.unsqueeze (-1), presence_mask.unsqueeze (-2))
+        attention_mask = cross_modal_mask.expand (batch_size, self.fusion_attention.num_heads, 3, 3)
 
-        # Apply modality weights
-        combined_features = combined_features * modality_weights.unsqueeze (2)
-
-        # Cross-modal attention
-        attention_mask = presence_mask.unsqueeze (1).repeat (1, 3, 1)  # [batch_size, 3, 3]
+        # Apply attention
         attended_features, _ = self.fusion_attention (
-            combined_features, combined_features, combined_features, mask=attention_mask
+            combined_features, combined_features, combined_features,
+            mask=attention_mask
         )
 
-        # Fusion through MLP
-        fused = attended_features.reshape (batch_size, -1)  # Flatten for MLP input
+        # Final fusion through MLP
+        fused = attended_features.reshape (batch_size, -1)
         return self.fusion_mlp (fused)
+
 
     def forward(self,
                 image: Optional[torch.Tensor] = None,
