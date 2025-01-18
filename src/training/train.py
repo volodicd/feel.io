@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 from pathlib import Path
 import yaml
+import os
 import logging
 from datetime import datetime
 from tqdm import tqdm
@@ -16,7 +17,7 @@ from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
 
 from src.utils.visualization import ModelVisualizer, LRFinder
-from src.utils.data_aligment import align_datasets, label_level_align
+from src.utils.data_aligment import label_level_align
 
 
 def load_config(config_path: str):
@@ -26,20 +27,21 @@ def load_config(config_path: str):
 
 
 class EmotionTrainer:
-    def __init__ (self, config: Dict):
+    def __init__ (self, config_path: str = 'configs/training_config.yaml'):
         """
         Initialize trainer with configuration.
         Args:
-            config: Dictionary containing training configuration
+            config_path: Path to configuration file
         """
-        self.config = config
+        self.config = load_config(config_path)
         self.setup_logging()
         self.setup_directories()
         self.setup_device()
         self.setup_tensorboard()
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
         self.visualizer = ModelVisualizer (self.plot_dir)  # Initialize visualizer
-        self.scaler = torch.amp.GradScaler()  # For mixed precision training
+        self.scaler = torch.amp.GradScaler()
+
 
     def setup_device (self):
         """Setup CUDA device for training with proper initialization"""
@@ -94,14 +96,18 @@ class EmotionTrainer:
 
     def setup_directories (self):
         """Create necessary directories for saving results"""
-        self.checkpoint_dir = self.log_dir / 'checkpoints'
-        self.plot_dir = self.log_dir / 'plots'
+        timestamp = datetime.now ().strftime ("%Y%m%d_%H%M%S")
+        self.log_dir = Path (self.config['logging']['log_dir']) / timestamp
+        self.checkpoint_dir = self.log_dir / self.config['logging']['checkpoints_dir']
+        self.plot_dir = self.log_dir / self.config['logging']['plots_dir']
+
+        self.log_dir.mkdir (parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir (exist_ok=True)
         self.plot_dir.mkdir (exist_ok=True)
 
     def setup_tensorboard (self):
         """Initialize tensorboard writer"""
-        self.writer = SummaryWriter (self.log_dir / 'tensorboard')
+        self.writer = SummaryWriter(self.log_dir / 'tensorboard')
 
     def setup_model (self):
         """Initialize model, optimizer, criterion and scheduler with CUDA support"""
@@ -109,13 +115,13 @@ class EmotionTrainer:
         self.criterion = MultiModalLoss ().cuda ()
         self.optimizer = torch.optim.AdamW (
             self.model.parameters (),
-            lr=self.config['learning_rate'],
-            weight_decay=self.config['weight_decay']
+            lr=self.config['training']['learning_rate'],
+            weight_decay=self.config['training']['weight_decay']
         )
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau (
             self.optimizer,
             mode='min',
-            patience=self.config['scheduler_patience'],
+            patience=self.config['training']['scheduler_patience'],
             factor=0.5,
             verbose=True
         )
@@ -138,11 +144,11 @@ class EmotionTrainer:
             self.model, input_shape=((1, 16000), (224, 224), 50)
         )
 
-        for epoch in range (self.config['epochs']):
+        for epoch in range(self.config['training']['epochs']):
 
             # Training phase
             train_loss, train_metrics = self.train_epoch (train_loader, epoch)
-            logging.info (f"\n{'-' * 20} Epoch {epoch + 1}/{self.config['epochs']} {'-' * 20}")
+            logging.info (f"\n{'-' * 20} Epoch {epoch + 1}/{self.config['training']['epochs']} {'-' * 20}")
             logging.info ("Training Phase:")
             logging.info (f"  Loss: {train_loss:.4f}")
             logging.info (f"  Image Accuracy: {train_metrics['image_accuracy']:.4f}")
@@ -189,7 +195,7 @@ class EmotionTrainer:
             else:
                 early_stop_counter += 1
 
-            if early_stop_counter >= self.config['patience']:
+            if early_stop_counter >= self.config['training']['patience']:
                 logging.info ("Early stopping triggered")
                 break
 
@@ -223,23 +229,23 @@ class EmotionTrainer:
                 outputs = self.model (image=image, audio=audio, text_input=text_input)
                 loss = self.criterion (outputs, targets)
                 # Scale loss by accumulation steps
-                loss = loss / self.config['accumulation_steps']
+                loss = loss / self.config['optimization']['accumulation_steps']
 
             # Scaled backpropagation
             self.scaler.scale (loss).backward ()
 
-            if self.config.get ('grad_clip'):
+            if self.config['training'].get ('grad_clip'):
                 self.scaler.unscale_ (self.optimizer)
                 torch.nn.utils.clip_grad_norm_ (
                     self.model.parameters (),
-                    self.config['grad_clip']
+                    self.config['training']['grad_clip']
                 )
 
             self.scaler.step (self.optimizer)
             self.scaler.update ()
 
             # Update metrics
-            total_loss += loss.item ()*  self.config['accumulation_steps']
+            total_loss += loss.item ()*  self.config['optimization']['accumulation_steps']
 
             with torch.no_grad ():
                 for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
@@ -359,32 +365,38 @@ class EmotionTrainer:
                 continue
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
+    def export_model (self, export_path: str):
+        """
+        Export the trained model to ONNX and TensorFlow.js compatible formats.
+        """
+        # Ensure the model is in evaluation mode
+        self.model.eval ()
+
+        # Dummy input for tracing
+        dummy_input = torch.randn (1, *self.config['model_config']['input_shape']).to (self.device)
+
+        # Export to ONNX
+        onnx_path = os.path.join (export_path, 'emotion_model.onnx')
+        torch.onnx.export (
+            self.model,
+            dummy_input,
+            onnx_path,
+            export_params=True,
+            opset_version=11,
+            input_names=['input'],
+            output_names=['output']
+        )
+        logging.info (f'Exported model to ONNX format: {onnx_path}')
+
+        # Convert ONNX to TensorFlow.js (requires CLI tools)
+        os.system (f'onnx-tf convert -i {onnx_path} -o {export_path}/emotion_model_tf')
+        os.system (
+            f'tensorflowjs_converter --input_format=tf_saved_model --saved_model_dir={export_path}/emotion_model_tf --output_dir={export_path}/model_web')
+        logging.info (f'Converted ONNX model to TensorFlow.js format.')
+
 
 def main ():
-    # Configuration optimized for CUDA
-    config = {
-        'batch_size': 16,
-        'num_workers': 4,
-        'learning_rate': 1e-4,
-        'weight_decay': 5e-4,
-        'epochs': 20,
-        'patience': 5,
-        'scheduler_patience': 5,
-        'grad_clip': 0.5,
-        'warmup_steps': 3000,
-        'pin_memory': True,
-        'cuda_non_blocking': True,
-        'amp': True,
-        'accumulation_steps': 4,  # Add this
-    }
-
-    def get_lr_schedule (optimizer, warmup_steps):
-        def lr_lambda (step):
-            if step < warmup_steps:
-                return float (step) / float (max (1, warmup_steps))
-            return 1.0
-
-        return torch.optim.lr_scheduler.LambdaLR (optimizer, lr_lambda)
+    trainer = EmotionTrainer('configs/training_config.yaml')
 
     try:
         # Load datasets
@@ -395,34 +407,24 @@ def main ():
         ])
         audio_data = pd.read_csv ('data/processed/ravdess.csv')
         text_data = pd.read_csv ('data/processed/goemotions.csv')
-        max_token = text_data['text'].max()
-        print(f"Max token: {max_token}")
-        # Align datasets
-        print ("=== Checking distribution BEFORE alignment ===")
-        for emotion in range (7):
-            for split in ["train", "test"]:
-                count_img = len (image_data[(image_data["emotion"] == emotion) & (image_data["split"] == split)])
-                count_aud = len (audio_data[(audio_data["emotion"] == emotion) & (audio_data["split"] == split)])
-                count_txt = len (text_data[(text_data["emotion"] == emotion) & (text_data["split"] == split)])
-                print (f"emotion={emotion}, split={split}, "
-                       f"count_img={count_img}, count_aud={count_aud}, count_txt={count_txt}")
 
         logging.info ("Aligning datasets...")
         aligned_data = label_level_align(image_data, audio_data, text_data)
         if aligned_data is None:
-            print ("aligned_data returned None—no overlap found!")
-        else:
-            train_ratio = 0.3  # Use 30% of data for faster experiments
-            train_size = int (len (aligned_data['image']) * train_ratio)
-            for key in aligned_data:
-                aligned_data[key] = aligned_data[key].sample (n=train_size, random_state=42)
-            print ("\n=== Checking distribution AFTER alignment ===")
-            for dom in ["image", "audio", "text"]:
-                df_dom = aligned_data[dom]
-                print (f"---- {dom.upper ()} TRAIN ----")
-                print (df_dom[df_dom["split"] == "train"]["emotion"].value_counts ())
-                print (f"---- {dom.upper ()} TEST ----")
-                print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
+            raise RuntimeError("Failed to align datasets")
+
+        train_ratio = trainer.config['data']['train_ratio']
+        train_size = int (len (aligned_data['image']) * train_ratio)
+
+        for key in aligned_data:
+            aligned_data[key] = aligned_data[key].sample (n=train_size, random_state=42)
+        print ("\n=== Checking distribution AFTER alignment ===")
+        for dom in ["image", "audio", "text"]:
+            df_dom = aligned_data[dom]
+            print (f"---- {dom.upper ()} TRAIN ----")
+            print (df_dom[df_dom["split"] == "train"]["emotion"].value_counts ())
+            print (f"---- {dom.upper ()} TEST ----")
+            print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
 
@@ -461,26 +463,27 @@ def main ():
         # Data loaders
         train_loader = DataLoader (
             train_dataset,
-            batch_size = config['batch_size'],
+            batch_size=trainer.config['training']['batch_size'],
             sampler=RandomSampler (train_dataset),
-            num_workers=config['num_workers'],
-            pin_memory=config['pin_memory'],
-            persistent_workers=True
+            num_workers=trainer.config['training']['num_workers'],
+            pin_memory=trainer.config['data']['pin_memory'],
+            persistent_workers=trainer.config['data']['persistent_workers']
         )
 
         val_loader = DataLoader (
             val_dataset,
-            batch_size=config['batch_size'],
+            batch_size=trainer.config['training']['batch_size'],
             shuffle=False,
-            num_workers=config['num_workers'],
-            pin_memory=config['pin_memory'],
-            persistent_workers=True
+            num_workers=trainer.config['training']['num_workers'],
+            pin_memory=trainer.config['data']['pin_memory'],
+            persistent_workers=trainer.config['data']['persistent_workers']
         )
 
-
         # Initialize and train
-        trainer = EmotionTrainer (config)
-        trainer.train (train_loader, val_loader)
+        trainer.train(train_loader, val_loader)
+        export_dir = 'exported_models'
+        os.makedirs (export_dir, exist_ok=True)
+        trainer.export_model (export_dir)
 
     except Exception as e:
         logging.error (f"Training error: {str (e)}")

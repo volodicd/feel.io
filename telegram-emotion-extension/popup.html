@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Emotion Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            font-size: 18px;
+            color: #333;
+            text-align: center;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Telegram Emotion Analyzer</h1>
+    <button id="start-analysis">Start Emotion Analysis</button>
+    <button id="stop-analysis">Stop Emotion Analysis</button>
+    <p id="status">Click "Start" to begin analyzing emotions on Telegram.</p>
+
+    <script>
+        const startButton = document.getElementById('start-analysis');
+        const stopButton = document.getElementById('stop-analysis');
+        const statusText = document.getElementById('status');
+
+        startButton.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ type: 'startAnalysis' }, response => {
+                if (response.success) {
+                    statusText.textContent = 'Emotion analysis started.';
+                } else {
+                    statusText.textContent = 'Failed to start analysis.';
+                }
+            });
+        });
+
+        stopButton.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ type: 'stopAnalysis' }, response => {
+                if (response.success) {
+                    statusText.textContent = 'Emotion analysis stopped.';
+                } else {
+                    statusText.textContent = 'Failed to stop analysis.';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
