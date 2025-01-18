@@ -105,7 +105,7 @@ class ImprovedEmotionModel(nn.Module):
         self.text_token = nn.Parameter(torch.randn(1, 1, self.modality_dim))
 
         # Modality presence embedding
-        self.presence_embedding = nn.Parameter(torch.randn(2, self.modality_dim))
+        self.presence_embedding = nn.Parameter(torch.randn(3, self.modality_dim))
 
         # Modality-specific projections
         self.image_proj = nn.Linear(image_config['channels'][2], self.modality_dim)
