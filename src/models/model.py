@@ -245,7 +245,8 @@ class ImprovedEmotionModel(nn.Module):
         # Process audio if available
         if audio is not None:
             spectrogram = self.spectrogram (audio)  # Convert raw audio to spectrogram
-            audio_features = self.audio_encoder (spectrogram.unsqueeze (1))  # Add channel dimension
+            spectrogram = spectrogram.unsqueeze (1)  # Add a channel dimension for 2D convolutions
+            audio_features = self.audio_encoder (spectrogram)  # Pass to the audio encoder
             predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
         else:
             audio_features = None
