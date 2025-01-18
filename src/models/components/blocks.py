@@ -62,33 +62,3 @@ class ResidualBlock(nn.Module):
 
         out += identity
         return F.relu(out)
-
-
-class ResidualBlock1D (nn.Module):
-    def __init__ (self, in_channels: int, out_channels: int, stride: int = 1):
-        super ().__init__ ()
-        # Main path
-        self.main_path = nn.Sequential (
-            nn.Conv1d (in_channels, out_channels, 3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm1d (out_channels),
-            nn.ReLU (inplace=True),
-            nn.Conv1d (out_channels, out_channels, 3, padding=1, bias=False),
-            nn.BatchNorm1d (out_channels)
-        )
-
-        # Skip connection
-        if stride != 1 or in_channels != out_channels:
-            self.shortcut = nn.Sequential (
-                nn.Conv1d (in_channels, out_channels, 1, stride=stride, bias=False),
-                nn.BatchNorm1d (out_channels)
-            )
-        else:
-            self.shortcut = nn.Identity ()
-
-        self.relu = nn.ReLU (inplace=True)
-
-    def forward (self, x):
-        identity = self.shortcut (x)
-        out = self.main_path (x)
-        out += identity
-        return self.relu (out)

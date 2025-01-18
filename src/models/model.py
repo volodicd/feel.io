@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import Dict, Optional
-from src.models.components.blocks import ResidualBlock, ResidualBlock1D
+from src.models.components.blocks import ResidualBlock
 from src.models.components.attention import MultiHeadAttention
+import torchaudio.transforms as T
 
 def load_model_conf(config_path: str = 'configs/model_config.yaml') -> Dict:
     """Load model configuration from YAML file"""
@@ -60,23 +61,23 @@ class ImprovedEmotionModel(nn.Module):
         # -------------------------------------------------------------
         # 2. Audio Encoder (1D conv blocks)
         # -------------------------------------------------------------
-        self.audio_encoder = nn.Sequential(
-            nn.Conv1d(1, audio_config['initial_channels'], kernel_size=audio_config['kernel_size'], stride=2, padding=3),
-            nn.BatchNorm1d(audio_config['initial_channels']),
-            nn.ReLU(inplace=True),
-            nn.MaxPool1d(kernel_size=3, stride=2, padding=1),
-
-            ResidualBlock1D(audio_config['channels'][0], audio_config['channels'][0]),
-            ResidualBlock1D(audio_config['channels'][0], audio_config['channels'][0]),
-            ResidualBlock1D(audio_config['channels'][0], audio_config['channels'][1], 2),
-            ResidualBlock1D(audio_config['channels'][1], audio_config['channels'][1]),
-            ResidualBlock1D(audio_config['channels'][1], audio_config['channels'][2], 2),
-            ResidualBlock1D(audio_config['channels'][2], audio_config['channels'][2]),
-
-            nn.AdaptiveAvgPool1d(1),
-            nn.Flatten(),
-            nn.Dropout(dropouts['audio_encoder']),
-            nn.Linear(audio_config['channels'][2], audio_config['channels'][2])
+        self.spectrogram = T.MelSpectrogram (
+            sample_rate=16000,
+            n_fft=400,
+            win_length=400,
+            hop_length=160,
+            n_mels=64,
+            power=2.0,
+        )
+        self.audio_encoder = nn.Sequential (
+            ResidualBlock (in_channels=1, out_channels=32, stride=2),  # Initial channels
+            ResidualBlock (32, 64, stride=2),
+            ResidualBlock (64, 128, stride=2),
+            nn.AdaptiveAvgPool2d ((1, 1)),  # Global pooling for flattened output
+            nn.Flatten (),
+            nn.Linear (128, 256),  # Project to a fixed embedding size
+            nn.ReLU (),
+            nn.Dropout (0.3),
         )
 
         # -------------------------------------------------------------
@@ -243,8 +244,9 @@ class ImprovedEmotionModel(nn.Module):
 
         # Process audio if available
         if audio is not None:
-            audio_features = self.audio_encoder(audio).squeeze(-1)
-            predictions['audio_pred'] = self.classifiers['audio'](audio_features)
+            spectrogram = self.spectrogram (audio)  # Convert raw audio to spectrogram
+            audio_features = self.audio_encoder (spectrogram.unsqueeze (1))  # Add channel dimension
+            predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
         else:
             audio_features = None
 
