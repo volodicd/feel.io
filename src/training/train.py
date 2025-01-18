@@ -388,7 +388,7 @@ class EmotionTrainer:
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
     def export_model (self, export_path: str):
-        """Export model to ONNX with optimizations for browser deployment"""
+        """Export model using PyTorch JIT for browser deployment"""
         self.model.eval ()
         os.makedirs (export_path, exist_ok=True)
 
@@ -420,7 +420,6 @@ class EmotionTrainer:
                 if audio is not None:
                     # Process audio into spectrogram
                     spec = self.spectrogram (audio)  # [B, 64, T]
-                    # Take magnitude of the complex spectrogram (extract real part)
                     spec = torch.abs (spec)  # Convert complex to magnitude
                     spec = torch.log1p (spec)  # Apply log transformation
                     spec = spec.squeeze (1)  # [B, 64, T]
@@ -461,28 +460,14 @@ class EmotionTrainer:
                 assert key in outputs, f"Missing {key} in model outputs"
                 assert outputs[key].shape[1] == len (self.emotion_labels), f"Shape mismatch for {key}"
 
-        # Export to ONNX
+        # Export to TorchScript using JIT tracing
         try:
-            torch.onnx.export (
-                wrapped_model,
-                args=(dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']),
-                f=os.path.join (export_path, 'emotion_model.onnx'),
-                input_names=['image', 'audio', 'text_input'],
-                output_names=['image_pred', 'audio_pred', 'text_pred', 'fusion_pred'],
-                dynamic_axes={
-                    'image': {0: 'batch_size'},
-                    'audio': {0: 'batch_size'},
-                    'text_input': {0: 'batch_size'},
-                    'image_pred': {0: 'batch_size'},
-                    'audio_pred': {0: 'batch_size'},
-                    'text_pred': {0: 'batch_size'},
-                    'fusion_pred': {0: 'batch_size'}
-                },
-                do_constant_folding=True,
-                opset_version=17,  # Ensure using opset version 17 or above
-                keep_initializers_as_inputs=True,
-                verbose=True
-            )
+            # Trace the model to convert it into a TorchScript representation
+            traced_model = torch.jit.trace (wrapped_model,
+                                            (dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']))
+
+            # Save the TorchScript model
+            traced_model.save (os.path.join (export_path, 'emotion_model.pt'))
 
             # Save model metadata
             model_metadata = {
@@ -507,6 +492,7 @@ class EmotionTrainer:
 
         logging.info (f'Model successfully exported to {export_path}')
         return True
+
 
 def main ():
     trainer = EmotionTrainer('configs/training_config.yaml')
