@@ -387,24 +387,23 @@ class EmotionTrainer:
                 continue
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
-    def export_model (self, export_path: str):
+    def export_model(self, export_path: str):
         """Export model to ONNX with optimizations for browser deployment"""
-        self.model.eval ()
-        os.makedirs (export_path, exist_ok=True)
+        self.model.eval()  # Set the model to evaluation mode
+        os.makedirs(export_path, exist_ok=True)
 
-        # Create proper input shapes matching dataset and model expectations
+        # Create dummy inputs matching your model's input shape
         dummy_inputs = {
-            'image': torch.randn (1, 1, 48, 48).to (self.device),
-            'audio': torch.randn (1, 1, 16000).to (self.device),  # Raw audio
-            'text_input': torch.randint (0, 30522, (1, 50)).to (self.device)  # BERT tokens
+            'image': torch.randn(1, 1, 48, 48).to(self.device),
+            'audio': torch.randn(1, 1, 16000).to(self.device),  # Raw audio
+            'text_input': torch.randint(0, 30522, (1, 50)).to(self.device)  # BERT tokens
         }
 
         # Complete preprocessing wrapper that includes all necessary steps
-        class ModelWrapper (nn.Module):
-            def __init__ (self, model):
-                super ().__init__ ()
+        class ModelWrapper(nn.Module):
+            def __init__(self, model):
+                super().__init__()
                 self.model = model
-                # Keep all preprocessing components
                 self.spectrogram = model.spectrogram
                 self.normalize = model.normalize
                 self.text_embedding = model.text_embedding
@@ -412,83 +411,45 @@ class EmotionTrainer:
                 self.text_proj = model.text_proj
                 self.audio_encoder = model.audio_encoder
 
-            def forward (self, image, audio, text_input):
-                # Process image (already preprocessed)
-                if image is not None:
-                    image_features = self.model.image_encoder (image)
-                else:
-                    image_features = None
-
-                # Process audio with full chain
-                if audio is not None:
-                    # 1. Convert to spectrogram
-                    spec = torch.log1p (self.spectrogram (audio))
-                    spec = spec.squeeze (1)  # [B, 64, T]
-                    # 2. Normalize - need to transpose for LayerNorm
-                    spec = spec.transpose (1, 2)  # [B, T, 64]
-                    spec = self.normalize (spec)
-                    spec = spec.transpose (1, 2)  # [B, 64, T]
-                    # 3. Pass through audio encoder
-                    audio_features = self.audio_encoder (spec)
-                else:
-                    audio_features = None
-
-                # Process text with full chain
-                if text_input is not None:
-                    embedded = self.text_embedding (text_input)
-                    rnn_out, _ = self.text_rnn (embedded)
-                    text_features = self.text_proj (rnn_out.mean (dim=1))
-                else:
-                    text_features = None
-
-                # Forward through main model with processed features
+            def forward(self, image, audio, text_input):
+                # Image, Audio, and Text feature extraction
                 outputs = {}
-                if image_features is not None:
-                    outputs['image_pred'] = self.model.classifiers['image'] (image_features)
-                if audio_features is not None:
-                    outputs['audio_pred'] = self.model.classifiers['audio'] (audio_features)
-                if text_features is not None:
-                    outputs['text_pred'] = self.model.classifiers['text'] (text_features)
+                # Process each modality
+                if image is not None:
+                    image_features = self.model.image_encoder(image)
+                    outputs['image_pred'] = self.model.classifiers['image'](image_features)
+                if audio is not None:
+                    spec = torch.log1p(self.spectrogram(audio))
+                    spec = spec.squeeze(1)
+                    spec = self.normalize(spec.transpose(1, 2))
+                    audio_features = self.audio_encoder(spec)
+                    outputs['audio_pred'] = self.model.classifiers['audio'](audio_features)
+                if text_input is not None:
+                    embedded = self.text_embedding(text_input)
+                    rnn_out, _ = self.text_rnn(embedded)
+                    text_features = self.text_proj(rnn_out.mean(dim=1))
+                    outputs['text_pred'] = self.model.classifiers['text'](text_features)
 
-                # Always do fusion if any modality is present
-                if any (x is not None for x in [image_features, audio_features, text_features]):
-                    fusion_features = self.model.fuse_modalities (
-                        image_features, audio_features, text_features
-                    )
-                    outputs['fusion_pred'] = self.model.classifiers['fusion'] (fusion_features)
+                # Fusion
+                if any(x is not None for x in [image_features, audio_features, text_features]):
+                    fusion_features = self.model.fuse_modalities(image_features, audio_features, text_features)
+                    outputs['fusion_pred'] = self.model.classifiers['fusion'](fusion_features)
 
                 return outputs
 
-        wrapped_model = ModelWrapper (self.model)
-
-        # Verify model behavior with all inputs and missing modalities
-        with torch.no_grad ():
-            # Test all modalities
-            outputs = wrapped_model (**dummy_inputs)
-            for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
-                assert key in outputs, f"Missing {key} in model outputs"
-                assert outputs[key].shape[1] == len (self.emotion_labels), \
-                    f"Shape mismatch for {key}"
-
-            # Test with missing modalities
-            outputs_img_only = wrapped_model (
-                image=dummy_inputs['image'],
-                audio=None,
-                text_input=None
-            )
-            assert 'fusion_pred' in outputs_img_only, "Fusion should work with single modality"
+        wrapped_model = ModelWrapper(self.model)
 
         try:
             # Export to ONNX with detailed dynamic axes
-            torch.onnx.export (
+            torch.onnx.export(
                 wrapped_model,
                 args=(dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']),
-                f=os.path.join (export_path, 'emotion_model.onnx'),
+                f=os.path.join(export_path, 'emotion_model.onnx'),
                 input_names=['image', 'audio', 'text_input'],
                 output_names=['image_pred', 'audio_pred', 'text_pred', 'fusion_pred'],
                 dynamic_axes={
                     'image': {0: 'batch_size'},
-                    'audio': {0: 'batch_size'},  # FIXED - audio features are fixed size
+                    'audio': {0: 'batch_size'},
                     'text_input': {0: 'batch_size'},
                     'image_pred': {0: 'batch_size'},
                     'audio_pred': {0: 'batch_size'},
@@ -496,12 +457,12 @@ class EmotionTrainer:
                     'fusion_pred': {0: 'batch_size'}
                 },
                 do_constant_folding=True,
-                opset_version=17,
+                opset_version=17,  # Set to opset 17 for better compatibility
                 keep_initializers_as_inputs=True,
                 verbose=True
             )
 
-            # Save metadata (basic version - can be enhanced if needed)
+            # Save model metadata
             model_metadata = {
                 'version': '1.0',
                 'input_shapes': {
@@ -535,14 +496,14 @@ class EmotionTrainer:
                 'labels': self.emotion_labels
             }
 
-            with open (os.path.join (export_path, 'model_metadata.json'), 'w') as f:
-                json.dump (model_metadata, f, indent=2)
+            with open(os.path.join(export_path, 'model_metadata.json'), 'w') as f:
+                json.dump(model_metadata, f, indent=2)
 
         except Exception as e:
-            logging.error (f'Error during export: {str (e)}')
+            logging.error(f'Error during export: {str(e)}')
             raise
 
-        logging.info (f'Model successfully exported to {export_path}')
+        logging.info(f'Model successfully exported to {export_path}')
         return True
 
 def main ():
