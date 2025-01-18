@@ -1,6 +1,6 @@
 training:
   batch_size: 32
-  num_workers: 8
+  num_workers: 6
   learning_rate: 1e-4
   weight_decay: 5e-4
   epochs: 50
@@ -10,14 +10,14 @@ training:
   warmup_steps: 3000
 
 data:
-  train_ratio: 0.8
+  train_ratio: 0.6
   pin_memory: true
   persistent_workers: true
 
 optimization:
   amp: true
   cuda_non_blocking: true
-  accumulation_steps: 1
+  accumulation_steps: 2
 
 logging:
   log_dir: "logs"
