@@ -261,6 +261,8 @@ class ImprovedEmotionModel(nn.Module):
         importance_weights = F.softmax (self.modality_importance, dim=0).view (1, 3, 1, 1)
         attention_mask = attention_mask * importance_weights
 
+        print (f"importance_weights shape: {importance_weights.shape}")
+        print (f"attention_mask shape before multiplication: {attention_mask.shape}")
         # Apply fusion attention
         attended_features, _ = self.fusion_attention (
             combined_features, combined_features, combined_features,
