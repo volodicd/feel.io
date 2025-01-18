@@ -178,7 +178,7 @@ class ImprovedEmotionModel(nn.Module):
 
     def fuse_modalities (self, image_features=None, audio_features=None, text_features=None):
         """
-        Improved fusion mechanism with normalized modality weighting and attention dropout.
+        Improved fusion mechanism with adaptive modality weighting and attention.
         """
         batch_size = next (x.size (0) for x in [image_features, audio_features, text_features] if x is not None)
         device = next (x.device for x in [image_features, audio_features, text_features] if x is not None)
@@ -200,8 +200,7 @@ class ImprovedEmotionModel(nn.Module):
                 # Project features and add modality token
                 proj_features = proj (features_tensor)
                 mod_token = token.expand (batch_size, -1, -1)
-                weighted_features = proj_features.unsqueeze (1) + mod_token
-                features.append (weighted_features)
+                features.append (proj_features.unsqueeze (1) + mod_token)
 
                 # Learnable modality-specific weight
                 modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size, -1)
@@ -213,30 +212,26 @@ class ImprovedEmotionModel(nn.Module):
                 mod_token = token.expand (batch_size, -1, -1)
                 absent_emb = self.presence_embedding[1:2].expand (batch_size, 1, -1)
                 features.append (mod_token + absent_emb)
-                modality_weights.append (torch.zeros (batch_size, self.modality_dim, device=device))
+
+        # Combine features
+        combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
 
         # Normalize modality weights
         modality_weights = torch.stack (modality_weights, dim=1)  # [batch_size, 3, modality_dim]
         modality_weights = torch.softmax (modality_weights, dim=1)  # Normalize across modalities
 
-        # Ensure weights match combined_features for broadcasting
-        combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
-        modality_weights = modality_weights.unsqueeze (2).expand_as (combined_features)
+        # Apply modality weights
+        combined_features = combined_features * modality_weights.unsqueeze (2)
 
-        # Combine features and weights
-        combined_features = combined_features * modality_weights
-
-        # Cross-modal attention with dropout
+        # Cross-modal attention
         attention_mask = presence_mask.unsqueeze (1).repeat (1, 3, 1)  # [batch_size, 3, 3]
         attended_features, _ = self.fusion_attention (
             combined_features, combined_features, combined_features, mask=attention_mask
         )
-        attended_features = self.attention_dropout (attended_features)
 
         # Fusion through MLP
         fused = attended_features.reshape (batch_size, -1)  # Flatten for MLP input
         return self.fusion_mlp (fused)
-
 
     def forward(self,
                 image: Optional[torch.Tensor] = None,
