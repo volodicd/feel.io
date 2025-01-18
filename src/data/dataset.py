@@ -149,7 +149,7 @@ class MultiModalEmotionDataset(Dataset):
             mono=True
         )
         waveform = self._pad_audio(self.augmentation.augment_audio(waveform))
-        audio = torch.tensor(waveform, dtype=torch.float32).unsqueeze(0)
+        audio = torch.tensor(waveform, dtype=torch.float32)
 
         # Process text
         text = self.text_data.iloc[idx]['text']
