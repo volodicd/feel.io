@@ -70,14 +70,22 @@ class ImprovedEmotionModel(nn.Module):
             power=2.0,
         )
         self.audio_encoder = nn.Sequential (
-            ResidualBlock (in_channels=1, out_channels=32, stride=2),  # Initial channels
-            ResidualBlock (32, 64, stride=2),
-            ResidualBlock (64, 128, stride=2),
-            nn.AdaptiveAvgPool2d ((1, 1)),  # Global pooling for flattened output
+            # Increase kernel size and reduce stride for better temporal features
+            nn.Conv1d (1, audio_config['initial_channels'], kernel_size=31, stride=1, padding=15),
+            nn.BatchNorm1d (audio_config['initial_channels']),
+            nn.ReLU (inplace=True),
+            nn.Dropout (0.2),
+
+            # Keep existing ResidualBlock1D layers but with modified channels
+            ResidualBlock1D (audio_config['channels'][0], audio_config['channels'][0]),
+            ResidualBlock1D (audio_config['channels'][0], audio_config['channels'][1], 2),
+            ResidualBlock1D (audio_config['channels'][1], audio_config['channels'][1]),
+            ResidualBlock1D (audio_config['channels'][1], audio_config['channels'][2], 2),
+
+            nn.AdaptiveAvgPool1d (1),
             nn.Flatten (),
-            nn.Linear (128, 256),  # Project to a fixed embedding size
-            nn.ReLU (),
-            nn.Dropout (0.3),
+            nn.Dropout (dropouts['audio_encoder']),
+            nn.Linear (audio_config['channels'][2], audio_config['channels'][2])
         )
 
         # -------------------------------------------------------------

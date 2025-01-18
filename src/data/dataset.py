@@ -68,29 +68,37 @@ class EmotionAugmentation:
             print(f"Error processing image {image_path}: {str(e)}")
             return torch.zeros(1, *self.config['preprocessing']['image']['size'])
 
-    def augment_audio(self, waveform: np.ndarray, sr: int = None) -> np.ndarray:
+    def augment_audio (self, waveform: np.ndarray, sr: int = None) -> np.ndarray:
         if self.split != 'train' or self.audio_params is None:
             return waveform
 
-        if sr is None:
-            sr = self.full_config['preprocessing']['audio']['sample_rate']
+        # Convert to mel spectrogram first
+        mel_spec = librosa.feature.melspectrogram (
+            y=waveform,
+            sr=sr,
+            n_mels=80,
+            hop_length=256
+        )
+        mel_spec = librosa.power_to_db (mel_spec)
 
-        # Pitch shift
-        if random.random() < 0.5:
-            n_steps = random.uniform(*self.audio_params['pitch_shift'])
-            waveform = librosa.effects.pitch_shift(waveform, sr=sr, n_steps=n_steps)
+        # Apply time masking
+        if random.random () < 0.5:
+            mask_size = int (mel_spec.shape[1] * 0.1)  # 10% of time steps
+            mask_start = random.randint (0, mel_spec.shape[1] - mask_size)
+            mel_spec[:, mask_start:mask_start + mask_size] = mel_spec.min ()
 
-        # Speed change
-        if random.random() < 0.5:
-            speed_factor = random.uniform(*self.audio_params['speed_change'])
-            waveform = librosa.effects.time_stretch(waveform, rate=speed_factor)
+        # Apply frequency masking
+        if random.random () < 0.5:
+            mask_size = int (mel_spec.shape[0] * 0.1)  # 10% of frequency bins
+            mask_start = random.randint (0, mel_spec.shape[0] - mask_size)
+            mel_spec[mask_start:mask_start + mask_size, :] = mel_spec.min ()
 
-        # Add noise
-        if random.random() < 0.5:
-            noise = np.random.randn(len(waveform))
-            waveform = waveform + self.audio_params['noise_factor'] * noise
-
-        return waveform
+        # Convert back to waveform
+        return librosa.feature.inverse.mel_to_audio(
+            librosa.db_to_power (mel_spec),
+            sr=sr,
+            hop_length=256
+        )
 
 class MultiModalEmotionDataset(Dataset):
     def __init__(self, config_path: str = 'configs/dataset_config.yaml', split='train',
