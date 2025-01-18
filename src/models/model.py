@@ -259,7 +259,9 @@ class ImprovedEmotionModel(nn.Module):
 
         # Apply learned modality importance
         importance_weights = F.softmax (self.modality_importance, dim=0).view (1, 3, 1, 1)
-        importance_weights = importance_weights.expand (batch_size, 1, 3, 3)
+        print (f"importance_weights before expand: {importance_weights.shape}")
+        importance_weights = importance_weights.expand (batch_size, self.fusion_attention.num_heads, 3, 3)
+        print (f"importance_weights after expand: {importance_weights.shape}")
         print (f"importance_weights shape: {importance_weights.shape}")
         print (f"attention_mask shape before multiplication: {attention_mask.shape}")
         attention_mask = attention_mask * importance_weights
