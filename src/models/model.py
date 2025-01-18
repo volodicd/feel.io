@@ -204,8 +204,7 @@ class ImprovedEmotionModel(nn.Module):
                 features.append (weighted_features)
 
                 # Learnable modality-specific weight
-                modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size,
-                                                                                               self.modality_dim)
+                modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size, -1)
                 modality_weights.append (modality_weight)
 
                 presence_mask[:, idx] = 1
@@ -222,7 +221,7 @@ class ImprovedEmotionModel(nn.Module):
 
         # Ensure weights match combined_features for broadcasting
         combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
-        modality_weights = modality_weights.unsqueeze (-1).expand_as (combined_features)
+        modality_weights = modality_weights.unsqueeze (2).expand_as (combined_features)
 
         # Combine features and weights
         combined_features = combined_features * modality_weights
