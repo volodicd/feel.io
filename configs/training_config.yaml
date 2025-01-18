@@ -1,6 +1,6 @@
 training:
   batch_size: 32
-  num_workers: 4
+  num_workers: 12
   learning_rate: 1e-4
   weight_decay: 5e-4
   epochs: 50
