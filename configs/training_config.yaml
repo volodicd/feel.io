@@ -3,7 +3,7 @@ training:
   num_workers: 4
   learning_rate: 1e-4
   weight_decay: 5e-4
-  epochs: 20
+  epochs: 2
   patience: 5
   scheduler_patience: 5
   grad_clip: 0.5
@@ -26,4 +26,4 @@ logging:
   tensorboard_dir: "tensorboard"
 
 model_config:
-  input_shape: [3, 224, 224]  # Added for export_model function
+  input_shape: [1, 224, 224]  # Added for export_model function
