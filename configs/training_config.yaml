@@ -10,7 +10,7 @@ training:
   warmup_steps: 2000
 
 data:
-  train_ratio: 0.3
+  train_ratio: 0.1
   pin_memory: true
   persistent_workers: true
 
