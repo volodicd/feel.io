@@ -77,7 +77,7 @@ class ImprovedEmotionModel(nn.Module):
 
         self.audio_encoder = nn.Sequential (
             # Increase kernel size and reduce stride for better temporal features
-            nn.Conv1d (1, audio_config['initial_channels'], kernel_size=31, stride=1, padding=15),
+            nn.Conv1d (64, audio_config['initial_channels'], kernel_size=31, stride=1, padding=15),
             nn.BatchNorm1d (audio_config['initial_channels']),
             nn.ReLU (inplace=True),
             nn.Dropout (0.2),
@@ -260,10 +260,11 @@ class ImprovedEmotionModel(nn.Module):
 
         # Process audio if available
         if audio is not None:
+            # Generate spectrogram
             spectrogram = torch.log1p (self.spectrogram (audio))
-            spectrogram = spectrogram.unsqueeze (1)  # Add channel dimension
-            assert spectrogram.dim () == 4, f"Unexpected shape: {spectrogram.shape}"  # Debugging step
-            audio_features = self.audio_encoder (spectrogram)  # Pass to the encoder
+            spectrogram = spectrogram.squeeze (1)  # Remove the extra channel dim
+            # Now shape is [batch_size, n_mels, time_steps]
+            audio_features = self.audio_encoder (spectrogram)
             predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
         else:
             audio_features = None
