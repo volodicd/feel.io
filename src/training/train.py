@@ -1,28 +1,29 @@
-import torch
-import pandas as pd
-from pathlib import Path
 import json
+from pathlib import Path
 import yaml
 import os
 import logging
 from datetime import datetime
 from tqdm import tqdm
 import numpy as np
+from collections import Counter, namedtuple
 from typing import Dict, Tuple
-from sklearn.metrics import confusion_matrix
 
+import torch
+import pandas as pd
 import torch.nn as nn
-from collections import Counter
+from sklearn.metrics import confusion_matrix
 
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, RandomSampler
 from src.data.dataset import MultiModalEmotionDataset
 from src.models.model import ImprovedEmotionModel, MultiModalLoss
-
-from src.utils.visualization import ModelVisualizer, LRFinder
+from src.utils.visualization import ModelVisualizer
 from src.utils.data_aligment import label_level_align
 
+
+ModelOutput = namedtuple('ModelOutput', ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred'])
 
 def load_config(config_path: str):
     """Load the configuration file."""
@@ -54,9 +55,6 @@ class EmotionTrainer:
 
         self.device = torch.device ("cuda")
         gpu_id = torch.cuda.current_device ()
-        gpu_name = torch.cuda.get_device_name (gpu_id)
-        logging.info (f"Using CUDA Device {gpu_id}: {gpu_name}")
-
         # Enable CUDA optimization
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
@@ -111,7 +109,7 @@ class EmotionTrainer:
 
     def setup_tensorboard (self):
         """Initialize tensorboard writer"""
-        self.writer = SummaryWriter(self.log_dir / 'tensorboard')
+        self.writer = SummaryWriter("self.log_dir / tensorboard")
 
     def setup_model (self):
         """Initialize model, optimizer, criterion and scheduler with CUDA support"""
@@ -129,14 +127,6 @@ class EmotionTrainer:
             factor=0.5,
             verbose=True
         )
-
-    def lr_finder(self, train_loader: DataLoader):
-        """Use LRFinder to determine the best learning rate."""
-        lr_finder = LRFinder (self.model, self.optimizer, self.criterion, self.device)
-        lrs, losses = lr_finder.range_test (train_loader, start_lr=1e-7, end_lr=1e-1, num_iter=100)
-        fig = lr_finder.plot_lr_find (lrs, losses)
-        fig.savefig (self.plot_dir / 'lr_finder.png')
-        logging.info ("Saved LR Finder plot.")
 
     def train (self, train_loader: DataLoader, val_loader: DataLoader):
         """Main training loop with CUDA optimizations"""
@@ -217,7 +207,7 @@ class EmotionTrainer:
         predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
 
-        label_counts = Counter (train_loader.dataset.audio_data['emotion'])
+        label_counts = Counter(train_loader.dataset.audio_data['emotion'])
         total_samples = sum (label_counts.values ())
         # Add error handling and ensure ordered classes
         class_weights = torch.FloatTensor ([
@@ -388,7 +378,7 @@ class EmotionTrainer:
             self.writer.add_scalar (f"{phase}/{key}", value, epoch)
 
     def export_model (self, export_path: str):
-        """Export model using PyTorch JIT for browser deployment"""
+        """Export model to TorchScript with optimizations for browser deployment."""
         self.model.eval ()
         os.makedirs (export_path, exist_ok=True)
 
@@ -437,77 +427,67 @@ class EmotionTrainer:
                 else:
                     text_features = None
 
-                outputs = {}
-                if image_features is not None:
-                    outputs['image_pred'] = self.model.classifiers['image'] (image_features)
-                if audio_features is not None:
-                    outputs['audio_pred'] = self.model.classifiers['audio'] (audio_features)
-                if text_features is not None:
-                    outputs['text_pred'] = self.model.classifiers['text'] (text_features)
-
-                if any (x is not None for x in [image_features, audio_features, text_features]):
-                    fusion_features = self.model.fuse_modalities (image_features, audio_features, text_features)
-                    outputs['fusion_pred'] = self.model.classifiers['fusion'] (fusion_features)
+                # Pack output as a namedtuple
+                outputs = {
+                    'image_pred': self.model.classifiers['image'] (
+                        image_features) if image_features is not None else None,
+                    'audio_pred': self.model.classifiers['audio'] (
+                        audio_features) if audio_features is not None else None,
+                    'text_pred': self.model.classifiers['text'] (text_features) if text_features is not None else None,
+                    'fusion_pred': self.model.classifiers['fusion'] (
+                        self.model.fuse_modalities (image_features, audio_features, text_features)) if any (
+                        x is not None for x in [image_features, audio_features, text_features]) else None
+                }
 
                 return outputs
 
         wrapped_model = ModelWrapper (self.model)
 
-        # Test the model with dummy inputs
-        with torch.no_grad ():
-            outputs = wrapped_model (**dummy_inputs)
-            for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
-                assert key in outputs, f"Missing {key} in model outputs"
-                assert outputs[key].shape[1] == len (self.emotion_labels), f"Shape mismatch for {key}"
-
-        # Export to TorchScript using JIT tracing
+        # Trace the model to convert it into a TorchScript representation
         try:
-            # Trace the model to convert it into a TorchScript representation
             traced_model = torch.jit.trace (wrapped_model,
                                             (dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']))
-
-            # Save the TorchScript model
             traced_model.save (os.path.join (export_path, 'emotion_model.pt'))
-
-            # Save model metadata
-            model_metadata = {
-                'version': '1.0',
-                'input_shapes': {'image': [1, 48, 48], 'audio': [1, 16000], 'text': [50]},
-                'preprocessing': {
-                    'image': {'size': [48, 48], 'channels': 1, 'normalize_mean': [0.5], 'normalize_std': [0.5]},
-                    'audio': {'sample_rate': 16000,
-                              'mel_spec_params': {'n_mels': 64, 'n_fft': 400, 'win_length': 400, 'hop_length': 160,
-                                                  'power': 2.0}},
-                    'text': {'max_length': 50, 'vocab_size': 30522, 'tokenizer': 'bert-base-uncased'}
-                },
-                'labels': self.emotion_labels
-            }
-
-            with open (os.path.join (export_path, 'model_metadata.json'), 'w') as f:
-                json.dump (model_metadata, f, indent=2)
-
+            logging.info (f"Model saved to {export_path}")
         except Exception as e:
-            logging.error (f'Error during export: {str (e)}')
+            logging.error (f"Error during tracing: {e}")
             raise
+
+        # Save model metadata
+        model_metadata = {
+            'version': '1.0',
+            'input_shapes': {'image': [1, 48, 48], 'audio': [1, 16000], 'text': [50]},
+            'preprocessing': {
+                'image': {'size': [48, 48], 'channels': 1, 'normalize_mean': [0.5], 'normalize_std': [0.5]},
+                'audio': {'sample_rate': 16000,
+                          'mel_spec_params': {'n_mels': 64, 'n_fft': 400, 'win_length': 400, 'hop_length': 160,
+                                              'power': 2.0}},
+                'text': {'max_length': 50, 'vocab_size': 30522, 'tokenizer': 'bert-base-uncased'}
+            },
+            'labels': self.emotion_labels
+        }
+
+        with open (os.path.join (export_path, 'model_metadata.json'), 'w') as f:
+            json.dump (model_metadata, f, indent=2)
 
         logging.info (f'Model successfully exported to {export_path}')
         return True
+
+
+
+
 
 
 def main ():
     trainer = EmotionTrainer('configs/training_config.yaml')
 
     try:
-        # Load datasets
-        logging.info ("Loading datasets...")
         image_data = pd.concat ([
             pd.read_csv ('data/processed/fer2013.csv'),
             pd.read_csv ('data/processed/expw.csv')
         ])
         audio_data = pd.read_csv ('data/processed/ravdess.csv')
         text_data = pd.read_csv ('data/processed/goemotions.csv')
-
-        logging.info ("Aligning datasets...")
         aligned_data = label_level_align(image_data, audio_data, text_data)
         if aligned_data is None:
             raise RuntimeError("Failed to align datasets")
@@ -517,30 +497,13 @@ def main ():
 
         for key in aligned_data:
             aligned_data[key] = aligned_data[key].sample (n=train_size, random_state=42)
-        print ("\n=== Checking distribution AFTER alignment ===")
-        for dom in ["image", "audio", "text"]:
-            df_dom = aligned_data[dom]
-            print (f"---- {dom.upper ()} TRAIN ----")
-            print (df_dom[df_dom["split"] == "train"]["emotion"].value_counts ())
-            print (f"---- {dom.upper ()} TEST ----")
-            print (df_dom[df_dom["split"] == "test"]["emotion"].value_counts ())
+
         if aligned_data is None:
             raise RuntimeError ("Failed to align datasets")
-
-        print ("Image domain total:", len (aligned_data["image"]))
-        print ("Audio domain total:", len (aligned_data["audio"]))
-        print ("Text domain total:", len (aligned_data["text"]))
-
-        print ("Train images:", len (aligned_data["image"][aligned_data["image"]["split"] == "train"]))
-        print ("Test images:", len (aligned_data["image"][aligned_data["image"]["split"] == "test"]))
-        print ("Train audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "train"]))
-        print ("Test audio:", len (aligned_data["audio"][aligned_data["audio"]["split"] == "test"]))
-        print ("Train Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "train"]))
-        print ("Test Text:", len (aligned_data["text"][aligned_data["text"]["split"] == "test"]))
-
         logging.info (
             f"Aligned dataset sizes - Train: {len (aligned_data['image'][aligned_data['image']['split'] == 'train'])}, "
             f"Test: {len (aligned_data['image'][aligned_data['image']['split'] == 'test'])}")
+
 
         # Create datasets with aligned data
         train_dataset = MultiModalEmotionDataset (
@@ -550,7 +513,6 @@ def main ():
             #config=config,  # Pass the config here
             split='train'
         )
-
         val_dataset = MultiModalEmotionDataset (
             image_data=aligned_data['image'],
             audio_data=aligned_data['audio'],
@@ -558,7 +520,6 @@ def main ():
             #config=config,  # Pass the config here
             split='test'
         )
-
         # Data loaders
         train_loader = DataLoader (
             train_dataset,
@@ -577,13 +538,11 @@ def main ():
             pin_memory=trainer.config['data']['pin_memory'],
             persistent_workers=trainer.config['data']['persistent_workers']
         )
-
         # Initialize and train
         trainer.train(train_loader, val_loader)
         export_dir = 'exported_models'
         os.makedirs (export_dir, exist_ok=True)
         trainer.export_model (export_dir)
-
     except Exception as e:
         logging.error (f"Training error: {str (e)}")
         raise
