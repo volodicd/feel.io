@@ -10,6 +10,9 @@ import numpy as np
 from typing import Dict, Tuple
 from sklearn.metrics import confusion_matrix
 
+import torch.nn as nn
+from collections import Counter
+
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, RandomSampler
@@ -213,6 +216,15 @@ class EmotionTrainer:
         predictions = {'image': [], 'audio': [], 'text': [], 'fusion': []}
         all_targets = []
 
+        label_counts = Counter (train_loader.dataset.audio_data['emotion'])
+        total_samples = sum (label_counts.values ())
+        # Add error handling and ensure ordered classes
+        class_weights = torch.FloatTensor ([
+            total_samples / (len (label_counts) * label_counts.get (i, 1))  # Added .get() with default
+            for i in range (7)  # Explicit range for 7 emotions
+        ]).cuda ()
+        criterion_audio = nn.CrossEntropyLoss(weight=class_weights)
+
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
         for batch in progress_bar:
             # Move data to GPU
@@ -227,7 +239,13 @@ class EmotionTrainer:
             # Mixed precision forward pass
             with torch.amp.autocast (device_type='cuda'):
                 outputs = self.model (image=image, audio=audio, text_input=text_input)
-                loss = self.criterion (outputs, targets)
+                # Apply weighted loss only to audio predictions
+                loss_audio = criterion_audio (outputs['audio_pred'], targets)
+                loss_others = self.criterion (
+                    {k: v for k, v in outputs.items () if k != 'audio_pred'},
+                    targets
+                )
+                loss = 0.4 * loss_audio + 0.6 * loss_others
                 # Scale loss by accumulation steps
                 loss = loss / self.config['optimization']['accumulation_steps']
 

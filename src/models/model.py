@@ -69,6 +69,12 @@ class ImprovedEmotionModel(nn.Module):
             n_mels=64,
             power=2.0,
         )
+        # Add normalization layer
+        self.normalize = nn.Sequential (
+            nn.LayerNorm (64),  # Normalize mel bins
+            nn.ReLU ()
+        )
+
         self.audio_encoder = nn.Sequential (
             # Increase kernel size and reduce stride for better temporal features
             nn.Conv1d (1, audio_config['initial_channels'], kernel_size=31, stride=1, padding=15),
@@ -77,10 +83,10 @@ class ImprovedEmotionModel(nn.Module):
             nn.Dropout (0.2),
 
             # Keep existing ResidualBlock1D layers but with modified channels
-            ResidualBlock1D (audio_config['channels'][0], audio_config['channels'][0]),
-            ResidualBlock1D (audio_config['channels'][0], audio_config['channels'][1], 2),
-            ResidualBlock1D (audio_config['channels'][1], audio_config['channels'][1]),
-            ResidualBlock1D (audio_config['channels'][1], audio_config['channels'][2], 2),
+            ResidualBlock1D(audio_config['channels'][0], audio_config['channels'][0]),
+            ResidualBlock1D(audio_config['channels'][0], audio_config['channels'][1], 2),
+            ResidualBlock1D(audio_config['channels'][1], audio_config['channels'][1]),
+            ResidualBlock1D(audio_config['channels'][1], audio_config['channels'][2], 2),
 
             nn.AdaptiveAvgPool1d (1),
             nn.Flatten (),
@@ -254,8 +260,8 @@ class ImprovedEmotionModel(nn.Module):
 
         # Process audio if available
         if audio is not None:
-            spectrogram = self.spectrogram (audio)  # Convert raw audio to spectrogram
-            spectrogram = spectrogram.unsqueeze (1)  # Add channel dimension, shape: [batch_size, 1, n_mels, time_steps]
+            spectrogram = torch.log1p (self.spectrogram (audio))
+            spectrogram = spectrogram.unsqueeze (1)  # Add channel dimension
             assert spectrogram.dim () == 4, f"Unexpected shape: {spectrogram.shape}"  # Debugging step
             audio_features = self.audio_encoder (spectrogram)  # Pass to the encoder
             predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
