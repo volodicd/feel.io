@@ -36,18 +36,7 @@ class ImprovedEmotionModel(nn.Module):
         image_config = self.config['image_encoder']
         audio_config = self.config['audio_encoder']
         text_config = self.config['text_encoder']
-        self.modality_uncertainty = nn.Parameter (torch.zeros (3))  # Learnable uncertainty per modality
-        self.modality_importance = nn.Parameter (torch.ones (3))  # Learnable importance weights
 
-        # Positional encodings for each modality
-        self.image_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
-        self.audio_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
-        self.text_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
-
-        # Absence tokens for missing modalities
-        self.image_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
-        self.audio_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
-        self.text_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
 
         # -------------------------------------------------------------
         # 1. Image Encoder with ResidualBlocks
@@ -124,21 +113,37 @@ class ImprovedEmotionModel(nn.Module):
         # -------------------------------------------------------------
         # 4. Advanced Fusion Mechanism
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # 4. Advanced Fusion Mechanism
+        # -------------------------------------------------------------
         # Modality dimension
         self.modality_dim = fusion_config['modality_dim']
 
+        # Add uncertainty and importance weights
+        self.modality_uncertainty = nn.Parameter (torch.zeros (3))
+        self.modality_importance = nn.Parameter (torch.ones (3))
+
+        # Modality-specific projections (MOVE THESE HERE)
+        self.image_proj = nn.Linear (image_config['channels'][2], self.modality_dim)
+        self.audio_proj = nn.Linear (audio_config['channels'][2], self.modality_dim)
+        self.text_proj = nn.Linear (self.rnn_hidden, self.modality_dim)
+
+        # Positional encodings and absence tokens
+        self.image_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.audio_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.text_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+
+        self.image_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.audio_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.text_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+
         # Learnable modality tokens
-        self.image_token = nn.Parameter(torch.randn(1, 1, self.modality_dim))
-        self.audio_token = nn.Parameter(torch.randn(1, 1, self.modality_dim))
-        self.text_token = nn.Parameter(torch.randn(1, 1, self.modality_dim))
+        self.image_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.audio_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.text_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
 
         # Modality presence embedding
-        self.presence_embedding = nn.Parameter(torch.randn(3, self.modality_dim))
-
-        # Modality-specific projections
-        self.image_proj = nn.Linear(image_config['channels'][2], self.modality_dim)
-        self.audio_proj = nn.Linear(audio_config['channels'][2], self.modality_dim)
-        self.text_proj = nn.Linear(self.rnn_hidden, self.modality_dim)
+        self.presence_embedding = nn.Parameter (torch.randn (3, self.modality_dim))
 
         # Cross-modal attention
         self.fusion_attention = MultiHeadAttention(
