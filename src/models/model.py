@@ -220,8 +220,9 @@ class ImprovedEmotionModel(nn.Module):
         modality_weights = torch.softmax (modality_weights, dim=1)  # Normalize across modalities
 
         # Combine features and weights
+        modality_weights = modality_weights.unsqueeze (-1)  # Add dimension for broadcasting
         combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
-        combined_features = combined_features * modality_weights.unsqueeze (-1)
+        combined_features = combined_features * modality_weights  # Ensure correct broadcasting
 
         # Cross-modal attention with dropout
         attention_mask = presence_mask.unsqueeze (1).repeat (1, 3, 1)  # [batch_size, 3, 3]
