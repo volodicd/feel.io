@@ -428,25 +428,23 @@ class EmotionTrainer:
                     text_features = None
 
                 # Pack output as a namedtuple
-                outputs = {
-                    'image_pred': self.model.classifiers['image'] (
-                        image_features) if image_features is not None else None,
-                    'audio_pred': self.model.classifiers['audio'] (
-                        audio_features) if audio_features is not None else None,
-                    'text_pred': self.model.classifiers['text'] (text_features) if text_features is not None else None,
-                    'fusion_pred': self.model.classifiers['fusion'] (
-                        self.model.fuse_modalities (image_features, audio_features, text_features)) if any (
-                        x is not None for x in [image_features, audio_features, text_features]) else None
-                }
-
+                outputs = ModelOutput (
+                    image_pred=self.model.image_head (image_features),
+                    audio_pred=self.model.audio_head (audio_features),
+                    text_pred=self.model.text_head (text_features),
+                    fusion_pred=self.model.classifiers['fusion'] (
+                        self.model.fuse_modalities (image_features, audio_features, text_features)
+                    ) if any (x is not None for x in [image_features, audio_features, text_features]) else None
+                )
                 return outputs
 
         wrapped_model = ModelWrapper (self.model)
 
         # Trace the model to convert it into a TorchScript representation
         try:
-            traced_model = torch.jit.trace (wrapped_model,
-                                            (dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input']))
+            traced_model = torch.jit.trace (
+                wrapped_model, (dummy_inputs['image'], dummy_inputs['audio'], dummy_inputs['text_input'])
+            )
             traced_model.save (os.path.join (export_path, 'emotion_model.pt'))
             logging.info (f"Model saved to {export_path}")
         except Exception as e:
