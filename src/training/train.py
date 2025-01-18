@@ -429,9 +429,9 @@ class EmotionTrainer:
 
                 # Pack output as a namedtuple
                 outputs = ModelOutput (
-                    image_pred=self.model.image_head (image_features),
-                    audio_pred=self.model.audio_head (audio_features),
-                    text_pred=self.model.text_head (text_features),
+                    image_pred=self.model.classifiers['image'] (image_features),
+                    audio_pred=self.model.classifiers['audio'] (audio_features),
+                    text_pred=self.model.classifiers['text'] (text_features),
                     fusion_pred=self.model.classifiers['fusion'] (
                         self.model.fuse_modalities (image_features, audio_features, text_features)
                     ) if any (x is not None for x in [image_features, audio_features, text_features]) else None
