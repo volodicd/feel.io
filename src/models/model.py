@@ -204,7 +204,8 @@ class ImprovedEmotionModel(nn.Module):
                 features.append (weighted_features)
 
                 # Learnable modality-specific weight
-                modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size, -1)
+                modality_weight = torch.sigmoid (self.presence_embedding[idx:idx + 1]).expand (batch_size,
+                                                                                               self.modality_dim)
                 modality_weights.append (modality_weight)
 
                 presence_mask[:, idx] = 1
@@ -219,10 +220,12 @@ class ImprovedEmotionModel(nn.Module):
         modality_weights = torch.stack (modality_weights, dim=1)  # [batch_size, 3, modality_dim]
         modality_weights = torch.softmax (modality_weights, dim=1)  # Normalize across modalities
 
-        # Combine features and weights
-        modality_weights = modality_weights.unsqueeze (-1)  # Add dimension for broadcasting
+        # Ensure weights match combined_features for broadcasting
         combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
-        combined_features = combined_features * modality_weights  # Ensure correct broadcasting
+        modality_weights = modality_weights.unsqueeze (-1).expand_as (combined_features)
+
+        # Combine features and weights
+        combined_features = combined_features * modality_weights
 
         # Cross-modal attention with dropout
         attention_mask = presence_mask.unsqueeze (1).repeat (1, 3, 1)  # [batch_size, 3, 3]
