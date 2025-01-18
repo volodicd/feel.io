@@ -244,10 +244,14 @@ class ImprovedEmotionModel(nn.Module):
 
         # Process audio if available
         if audio is not None:
-            spectrogram = self.spectrogram (audio)  # Convert raw audio to spectrogram
-            spectrogram = spectrogram.unsqueeze (1)  # Add a channel dimension for 2D convolutions
-            audio_features = self.audio_encoder (spectrogram)  # Pass to the audio encoder
-            predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
+            # Process audio input
+            if audio is not None:
+                spectrogram = self.spectrogram (audio)  # Convert raw audio to spectrogram
+                spectrogram = spectrogram.unsqueeze (1)  # Add a channel dimension for Conv2d
+                # Ensure spectrogram shape is [batch_size, 1, n_mels, time_steps]
+                assert len (spectrogram.shape) == 4, f"Unexpected shape: {spectrogram.shape}"
+                audio_features = self.audio_encoder (spectrogram)  # Pass to the audio encoder
+                predictions['audio_pred'] = self.classifiers['audio'] (audio_features)
         else:
             audio_features = None
 
