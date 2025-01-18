@@ -115,7 +115,7 @@ class EmotionTrainer:
         self.criterion = MultiModalLoss ().cuda ()
         self.optimizer = torch.optim.AdamW (
             self.model.parameters (),
-            lr=self.config['training']['learning_rate'],
+            lr=float(self.config['training']['learning_rate']),
             weight_decay=self.config['training']['weight_decay']
         )
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau (
