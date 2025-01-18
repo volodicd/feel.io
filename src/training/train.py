@@ -423,9 +423,11 @@ class EmotionTrainer:
                 if audio is not None:
                     # 1. Convert to spectrogram
                     spec = torch.log1p (self.spectrogram (audio))
-                    spec = spec.squeeze (1)
-                    # 2. Normalize
+                    spec = spec.squeeze (1)  # [B, 64, T]
+                    # 2. Normalize - need to transpose for LayerNorm
+                    spec = spec.transpose (1, 2)  # [B, T, 64]
                     spec = self.normalize (spec)
+                    spec = spec.transpose (1, 2)  # [B, 64, T]
                     # 3. Pass through audio encoder
                     audio_features = self.audio_encoder (spec)
                 else:
@@ -433,11 +435,8 @@ class EmotionTrainer:
 
                 # Process text with full chain
                 if text_input is not None:
-                    # 1. Embedding
                     embedded = self.text_embedding (text_input)
-                    # 2. LSTM processing
                     rnn_out, _ = self.text_rnn (embedded)
-                    # 3. Project and pool
                     text_features = self.text_proj (rnn_out.mean (dim=1))
                 else:
                     text_features = None
