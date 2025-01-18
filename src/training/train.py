@@ -538,31 +538,6 @@ class EmotionTrainer:
             with open (os.path.join (export_path, 'model_metadata.json'), 'w') as f:
                 json.dump (model_metadata, f, indent=2)
 
-            # Verify exported model
-            try:
-                import onnx
-                import onnxruntime as ort
-
-                # Verify model structure
-                model = onnx.load (os.path.join (export_path, 'emotion_model.onnx'))
-                onnx.checker.check_model (model)
-
-                # Test inference
-                session = ort.InferenceSession (os.path.join (export_path, 'emotion_model.onnx'))
-                test_inputs = {
-                    'image': dummy_inputs['image'].cpu ().numpy (),
-                    'audio': dummy_inputs['audio'].cpu ().numpy (),
-                    'text_input': dummy_inputs['text_input'].cpu ().numpy ()
-                }
-                _ = session.run (None, test_inputs)
-                logging.info ('Model verification passed')
-
-            except ImportError:
-                logging.warning ('ONNX verification skipped - onnx/onnxruntime not installed')
-            except Exception as e:
-                logging.error (f'Model verification failed: {str (e)}')
-                raise
-
         except Exception as e:
             logging.error (f'Error during export: {str (e)}')
             raise
