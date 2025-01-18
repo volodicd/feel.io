@@ -419,17 +419,15 @@ class EmotionTrainer:
 
                 if audio is not None:
                     # Process audio into spectrogram
-                    spec = torch.log1p (self.spectrogram (audio))
+                    spec = self.spectrogram (audio)  # [B, 64, T]
+                    # Take magnitude of the complex spectrogram (extract real part)
+                    spec = torch.abs (spec)  # Convert complex to magnitude
+                    spec = torch.log1p (spec)  # Apply log transformation
                     spec = spec.squeeze (1)  # [B, 64, T]
                     spec = spec.transpose (1, 2)  # [B, T, 64]
                     spec = self.normalize (spec)
                     spec = spec.transpose (1, 2)  # [B, 64, T]
-
-                    # Extract real part of the spectrogram (avoiding complex types)
-                    real_part = spec.real  # Convert complex spectrogram to real values
-
-                    # Pass through audio encoder
-                    audio_features = self.audio_encoder (real_part)
+                    audio_features = self.audio_encoder (spec)
                 else:
                     audio_features = None
 
@@ -509,7 +507,6 @@ class EmotionTrainer:
 
         logging.info (f'Model successfully exported to {export_path}')
         return True
-
 
 def main ():
     trainer = EmotionTrainer('configs/training_config.yaml')
