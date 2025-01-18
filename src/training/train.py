@@ -116,7 +116,7 @@ class EmotionTrainer:
         self.optimizer = torch.optim.AdamW (
             self.model.parameters (),
             lr=float(self.config['training']['learning_rate']),
-            weight_decay=self.config['training']['weight_decay']
+            weight_decay=float(self.config['training']['weight_decay'])
         )
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau (
             self.optimizer,
