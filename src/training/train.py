@@ -223,18 +223,15 @@ class EmotionTrainer:
             total_samples / (len (label_counts) * label_counts.get (i, 1))  # Added .get() with default
             for i in range (7)  # Explicit range for 7 emotions
         ]).cuda ()
-        criterion_audio = nn.CrossEntropyLoss(weight=class_weights)
+        criterion_audio = nn.CrossEntropyLoss (weight=class_weights)
 
         progress_bar = tqdm (train_loader, desc=f'Epoch {epoch + 1} Training')
-        for batch in progress_bar:
+        for batch_idx, batch in enumerate (progress_bar):
             # Move data to GPU
             audio = batch['audio'].cuda (non_blocking=True)
             image = batch['image'].cuda (non_blocking=True)
             text_input = batch['text'].cuda (non_blocking=True)
             targets = batch['emotion'].cuda (non_blocking=True)
-
-            # Clear gradients
-            self.optimizer.zero_grad (set_to_none=True)
 
             # Mixed precision forward pass
             with torch.amp.autocast (device_type='cuda'):
@@ -246,24 +243,31 @@ class EmotionTrainer:
                     targets
                 )
                 loss = 0.4 * loss_audio + 0.6 * loss_others
-                # Scale loss by accumulation steps
-                loss = loss / self.config['optimization']['accumulation_steps']
+
+                # Only scale loss if using gradient accumulation
+                if self.config['optimization'].get ('accumulation_steps', 1) > 1:
+                    loss = loss / self.config['optimization']['accumulation_steps']
 
             # Scaled backpropagation
             self.scaler.scale (loss).backward ()
 
-            if self.config['training'].get ('grad_clip'):
-                self.scaler.unscale_ (self.optimizer)
-                torch.nn.utils.clip_grad_norm_ (
-                    self.model.parameters (),
-                    self.config['training']['grad_clip']
-                )
+            # Only update optimizer after accumulating enough gradients
+            if (batch_idx + 1) % self.config['optimization'].get ('accumulation_steps', 1) == 0:
+                # Gradient clipping if configured
+                if self.config['training'].get ('grad_clip'):
+                    self.scaler.unscale_ (self.optimizer)
+                    torch.nn.utils.clip_grad_norm_ (
+                        self.model.parameters (),
+                        self.config['training']['grad_clip']
+                    )
 
-            self.scaler.step (self.optimizer)
-            self.scaler.update ()
+                # Optimizer steps
+                self.scaler.step (self.optimizer)
+                self.scaler.update ()
+                self.optimizer.zero_grad (set_to_none=True)
 
             # Update metrics
-            total_loss += loss.item ()*  self.config['optimization']['accumulation_steps']
+            total_loss += loss.item () * self.config['optimization']['accumulation_steps']
 
             with torch.no_grad ():
                 for key in ['image_pred', 'audio_pred', 'text_pred', 'fusion_pred']:
@@ -290,7 +294,6 @@ class EmotionTrainer:
                 metrics[f'{key}_accuracy'] = np.mean (
                     np.array (predictions[key]) == metrics['true_labels']
                 )
-
 
         return metrics['loss'], metrics
 

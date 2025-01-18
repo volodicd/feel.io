@@ -6,6 +6,8 @@ from typing import Dict, Optional
 from src.models.components.blocks import ResidualBlock, ResidualBlock1D
 from src.models.components.attention import MultiHeadAttention
 import torchaudio.transforms as T
+import torch.nn.functional as F
+
 
 def load_model_conf(config_path: str = 'configs/model_config.yaml') -> Dict:
     """Load model configuration from YAML file"""
@@ -34,6 +36,18 @@ class ImprovedEmotionModel(nn.Module):
         image_config = self.config['image_encoder']
         audio_config = self.config['audio_encoder']
         text_config = self.config['text_encoder']
+        self.modality_uncertainty = nn.Parameter (torch.zeros (3))  # Learnable uncertainty per modality
+        self.modality_importance = nn.Parameter (torch.ones (3))  # Learnable importance weights
+
+        # Positional encodings for each modality
+        self.image_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.audio_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.text_pos_encoding = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+
+        # Absence tokens for missing modalities
+        self.image_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.audio_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
+        self.text_absence_token = nn.Parameter (torch.randn (1, 1, self.modality_dim))
 
         # -------------------------------------------------------------
         # 1. Image Encoder with ResidualBlocks
@@ -190,58 +204,71 @@ class ImprovedEmotionModel(nn.Module):
         nn.init.normal_(self.text_token, mean=0.0, std=0.02)
         nn.init.normal_(self.presence_embedding, mean=0.0, std=0.02)
 
-
     def fuse_modalities (self, image_features: Optional[torch.Tensor] = None,
                          audio_features: Optional[torch.Tensor] = None,
                          text_features: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Advanced fusion mechanism using attention"""
+        """Robust fusion mechanism with proper missing modality handling"""
+        # Get batch size and device from available features
         batch_size = next (x.size (0) for x in [image_features, audio_features, text_features]
                            if x is not None)
         device = next (x.device for x in [image_features, audio_features, text_features]
                        if x is not None)
 
-        # Initialize feature list and presence mask
+        # Initialize storage for features and presence mask
         features = []
         presence_mask = torch.zeros (batch_size, 3, device=device)
 
-        # Process each modality
+        # Define modality configurations
         modalities = [
-            (image_features, self.image_token, self.image_proj, 0),
-            (audio_features, self.audio_token, self.audio_proj, 1),
-            (text_features, self.text_token, self.text_proj, 2)
+            (image_features, self.image_proj, self.image_pos_encoding,
+             self.image_absence_token, 0),
+            (audio_features, self.audio_proj, self.audio_pos_encoding,
+             self.audio_absence_token, 1),
+            (text_features, self.text_proj, self.text_pos_encoding,
+             self.text_absence_token, 2)
         ]
 
-        for features_tensor, token, proj, idx in modalities:
-            if features_tensor is not None:
-                # Project features and add modality token
-                proj_features = proj (features_tensor)
-                mod_token = token.expand (batch_size, -1, -1)
-                features.append (proj_features.unsqueeze (1) + mod_token)
-                presence_mask[:, idx] = 1
-            else:
-                # Use learned token with presence embedding
-                mod_token = token.expand (batch_size, -1, -1)
-                absent_emb = self.presence_embedding[1:2].expand (batch_size, 1, -1)
-                features.append (mod_token + absent_emb)
+        # Process each modality
+        for feat, proj, pos_enc, absence_token, idx in modalities:
+            if feat is not None:
+                # Project and add positional encoding
+                proj_feat = proj (feat)
+                if pos_enc is not None:
+                    proj_feat = proj_feat + pos_enc.expand (batch_size, -1, self.modality_dim)
 
-        # Combine features
+                # Add to features list
+                features.append (proj_feat.unsqueeze (1))
+                presence_mask[:, idx] = 1.0
+            else:
+                # Handle missing modality with learned absence token and uncertainty
+                uncertainty = torch.sigmoid (self.modality_uncertainty[idx])
+                missing_feat = absence_token.expand (batch_size, 1, -1) * uncertainty
+                features.append (missing_feat)
+
+        # Combine all features
         combined_features = torch.cat (features, dim=1)  # [batch_size, 3, modality_dim]
 
-        # Create proper attention mask
-        # First expand for number of attention heads
-        presence_mask = presence_mask.unsqueeze (1)  # [batch_size, 1, 3]
-        cross_modal_mask = torch.matmul (presence_mask.unsqueeze (-1), presence_mask.unsqueeze (-2))
-        attention_mask = cross_modal_mask.expand (batch_size, self.fusion_attention.num_heads, 3, 3)
+        # Create attention mask based on presence
+        presence_mask = presence_mask.unsqueeze (1).expand (batch_size, self.fusion_attention.num_heads, 3)
+        attention_mask = presence_mask.unsqueeze (-1) * presence_mask.unsqueeze (-2)
 
-        # Apply attention
+        # Apply learned modality importance
+        importance_weights = F.softmax (self.modality_importance, dim=0)
+        attention_mask = attention_mask * importance_weights.view (1, 1, 3, 3)
+
+        # Apply fusion attention
         attended_features, _ = self.fusion_attention (
             combined_features, combined_features, combined_features,
             mask=attention_mask
         )
 
-        # Final fusion through MLP
-        fused = attended_features.reshape (batch_size, -1)
-        return self.fusion_mlp (fused)
+        # Weighted pooling based on presence and importance
+        presence_weights = presence_mask.mean (1).unsqueeze (-1)  # [batch_size, 3, 1]
+        weighted_features = attended_features * presence_weights * importance_weights.view (1, 3, 1)
+
+        # Pool features and apply final MLP
+        pooled_features = weighted_features.sum (dim=1) / (presence_weights.sum (dim=1) + 1e-8)
+        return self.fusion_mlp (pooled_features)
 
 
     def forward(self,
