@@ -496,7 +496,7 @@ class EmotionTrainer:
                     'fusion_pred': {0: 'batch_size'}
                 },
                 do_constant_folding=True,
-                opset_version=12,
+                opset_version=17,
                 keep_initializers_as_inputs=True,
                 verbose=True
             )
